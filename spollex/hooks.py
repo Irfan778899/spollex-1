@@ -4,6 +4,22 @@ app_publisher = "4C Solutions"
 app_description = "This app is created to help trading companies to manage accounting"
 app_email = "info@4csolutions.in"
 app_license = "mit"
+
+fixtures = [
+    {
+        "doctype": "Custom Field",
+        "filters": {
+            "module": "Spollex"
+        }
+    },
+    {
+        "doctype": "Property Setter",
+        "filters": {
+            "module": "Spollex"
+        }
+    }
+]
+
 # required_apps = []
 
 # Includes in <head>
@@ -29,6 +45,9 @@ app_license = "mit"
 
 # include js in doctype views
 # doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {
+    "Sales Invoice" : "public/js/sales_invoice.js"
+    }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -117,6 +136,9 @@ app_license = "mit"
 # override_doctype_class = {
 # 	"ToDo": "custom_app.overrides.CustomToDo"
 # }
+override_doctype_class = {
+    "Sales Person": "spollex.overrides.sales_person.CustomSalesPerson"
+}
 
 # Document Events
 # ---------------
