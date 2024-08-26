@@ -46,19 +46,21 @@ def execute(filters=None):
 				"gross_profit_percent",
 				"project",
 			],
-#			"item_code": [
-#				"item_code",
-#				"item_name",
-#				"brand",
-#				"description",
-#				"qty",
-#				"base_rate",
-#				"buying_rate",
-#				"base_amount",
-#				"buying_amount",
-#				"gross_profit",
-#				"gross_profit_percent",
-#			],
+			"item_code": [
+				"item_code",
+				"item_name",
+				"brand",
+				"description",
+				"qty",
+				"base_rate",
+				"buying_rate",
+				"base_amount",
+				"buying_amount",
+				"commission_amount",
+				"incentive_amount",
+				"gross_profit",
+				"gross_profit_percent",
+			],
 		}
 	)
 
@@ -67,9 +69,9 @@ def execute(filters=None):
 	if filters.group_by == "Invoice":
 		get_data_when_grouped_by_invoice(columns, gross_profit_data, filters, group_wise_columns, data)
 
-#	else:
-#		get_data_when_not_grouped_by_invoice(gross_profit_data, filters, group_wise_columns, data)
-#
+	else:
+		get_data_when_not_grouped_by_invoice(gross_profit_data, filters, group_wise_columns, data)
+
 	return columns, data
 
 def get_data_when_grouped_by_invoice(columns, gross_profit_data, filters, group_wise_columns, data):
@@ -92,15 +94,15 @@ def get_data_when_grouped_by_invoice(columns, gross_profit_data, filters, group_
 		data.append(row)
 
 
-#def get_data_when_not_grouped_by_invoice(gross_profit_data, filters, group_wise_columns, data):
-#	for src in gross_profit_data.grouped_data:
-#		row = []
-#		for col in group_wise_columns.get(scrub(filters.group_by)):
-#			row.append(src.get(col))
-#
-#		row.append(filters.currency)
-#
-#		data.append(row)
+def get_data_when_not_grouped_by_invoice(gross_profit_data, filters, group_wise_columns, data):
+	for src in gross_profit_data.grouped_data:
+		row = []
+		for col in group_wise_columns.get(scrub(filters.group_by)):
+			row.append(src.get(col))
+
+		row.append(filters.currency)
+
+		data.append(row)
 
 
 def get_columns(group_wise_columns, filters):
@@ -427,18 +429,18 @@ class GrossProfitGenerator:
 						if flt(row.qty) or row.base_amount:
 							row = self.set_average_rate(row)
 							self.grouped_data.append(row)
-#			else:
-#				for i, row in enumerate(self.grouped[key]):
-#					if i == 0:
-#						new_row = row
-#					else:
-#						new_row.qty += flt(row.qty)
-#						new_row.buying_amount += flt(row.buying_amount, self.currency_precision)
-#						new_row.base_amount += flt(row.base_amount, self.currency_precision)
-#						new_row.commission_amount += flt(row.commission_amount, self.currency_precision)
-#						new_row.incentive_amount += flt(row.incentive_amount, self.currency_precision)
-#				new_row = self.set_average_rate(new_row)
-#				self.grouped_data.append(new_row)
+			else:
+				for i, row in enumerate(self.grouped[key]):
+					if i == 0:
+						new_row = row
+					else:
+						new_row.qty += flt(row.qty)
+						new_row.buying_amount += flt(row.buying_amount, self.currency_precision)
+						new_row.base_amount += flt(row.base_amount, self.currency_precision)
+						new_row.commission_amount += flt(row.commission_amount, self.currency_precision)
+						new_row.incentive_amount += flt(row.incentive_amount, self.currency_precision)
+				new_row = self.set_average_rate(new_row)
+				self.grouped_data.append(new_row)
 
 	def is_not_invoice_row(self, row):
 		return (self.filters.get("group_by") == "Invoice" and row.indent != 0.0) or self.filters.get(
@@ -523,7 +525,6 @@ class GrossProfitGenerator:
 		if item_code in self.non_stock_items and (row.project or row.cost_center):
 			# Issue 6089-Get last purchasing rate for non-stock item
 			item_rate = self.get_last_purchase_rate(item_code, row)
-			print(item_rate)
 			return flt(row.qty) * item_rate
 
 		else:
@@ -598,7 +599,6 @@ class GrossProfitGenerator:
 	def get_last_purchase_rate(self, item_code, row):
 		purchase_invoice = frappe.qb.DocType("Purchase Invoice")
 		purchase_invoice_item = frappe.qb.DocType("Purchase Invoice Item")
-		print("Hi")
 		query = (
 			frappe.qb.from_(purchase_invoice_item)
 			.inner_join(purchase_invoice)

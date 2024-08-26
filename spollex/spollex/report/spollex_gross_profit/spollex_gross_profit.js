@@ -1,7 +1,7 @@
 // Copyright (c) 2024, 4C Solutions and contributors
 // For license information, please see license.txt
 
-frappe.query_reports["Gross Profit Spollex"] = {
+frappe.query_reports["Spollex Gross Profit"] = {
 	"filters": [
 		{
 			fieldname: "company",
@@ -36,7 +36,7 @@ frappe.query_reports["Gross Profit Spollex"] = {
 			label: __("Group By"),
 			fieldtype: "Select",
 			options:
-				"Invoice",
+				"Invoice\nItem Code",
 			default: "Invoice",
 		},
 		{
