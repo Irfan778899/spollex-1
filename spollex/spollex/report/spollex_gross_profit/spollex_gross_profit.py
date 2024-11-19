@@ -756,6 +756,7 @@ class GrossProfitGenerator:
 			if invoice_base_net_total:
 				credit_note_for_item = (row.base_net_amount / invoice_base_net_total) * credit_note_total
 
+
 			# initialize list with a header row for each new parent
 			grouped.setdefault(row.parent, [invoice_row]).append(
 				row.update(
@@ -780,7 +781,7 @@ class GrossProfitGenerator:
 	def get_invoice_row(self, row, filters):
 		# header row format
 
-		default_income_account = frappe.get_cached_value("Company", filters.company, "default_income_account")
+		debit_account = frappe.get_cached_value("Account", {"account_name": "Rebate Given"}, "name")
 
 		credit_note_total = frappe.db.sql(
 			"""
@@ -800,7 +801,7 @@ class GrossProfitGenerator:
 				)
 				and `tabJournal Entry Account`.account = %s
 				and `tabJournal Entry Account`.docstatus = 1
-			""", (row.parent, default_income_account)
+			""", (row.parent, debit_account)
 		)
 
 		credit_note_total = credit_note_total[0][0] or 0 if credit_note_total else 0
