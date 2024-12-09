@@ -152,6 +152,12 @@ override_doctype_class = {
 # 		"on_trash": "method"
 # 	}
 # }
+doc_events = {
+    "Purchase Invoice": {
+        "on_submit": "spollex.doctype_events.purchase_invoice.create_journal_entry_on_submit",
+        "on_cancel": "spollex.doctype_events.purchase_invoice.cancel_journal_entry_on_cancel"
+    }
+}
 
 # Scheduled Tasks
 # ---------------
