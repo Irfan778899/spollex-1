@@ -26,7 +26,7 @@ def create_journal_entry(doc, charge_row):
         "party_type": "Supplier",
         "party": charge_row.custom_supplier,
         'debit_in_account_currency': 0,
-        'credit_in_account_currency': charge_row.tax_amount,
+        'credit_in_account_currency': charge_row.base_tax_amount,
         }
     )
 
@@ -35,7 +35,7 @@ def create_journal_entry(doc, charge_row):
         'account': charge_row.account_head,
         "party_type": "",
         "party": "",
-        'debit_in_account_currency': charge_row.tax_amount,
+        'debit_in_account_currency': charge_row.base_tax_amount,
         'credit_in_account_currency': 0,
         }
     )
