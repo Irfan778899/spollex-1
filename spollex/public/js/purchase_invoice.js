@@ -1,6 +1,6 @@
 frappe.ui.form.on("Purchase Invoice", {
     refresh: function(frm) {
-        if (frm.doc.docstatus === 1 & frm.doc.status != "Paid") {
+        if (frm.doc.docstatus === 1 && frm.doc.status != "Paid") {
             frm.add_custom_button(__("Post Purchase Debit Note"), function() {
                 post_purchase_debit_note(frm);
             });
@@ -15,6 +15,12 @@ let post_purchase_debit_note = async function(frm) {
             label: 'Rebate Amount',
             fieldname: 'rebate_amount',
             fieldtype: 'Currency'
+        },
+        {
+            label: 'Posting Date',
+            fieldname: 'posting_date',
+            fieldtype: 'Date',
+            default: frm.doc.posting_date
         }
     ];
     let tax_rates = [];
@@ -55,25 +61,30 @@ let post_purchase_debit_note = async function(frm) {
         fields: fields,
         primary_action_label: "Create Debit Note",
         primary_action: function(values) {
-            frappe.call({
-                method: 'spollex.utils.create_debit_note',
-                args: {
-                    party : frm.doc.supplier,
-                    rebate_amount : values.rebate_amount,
-                    company: frm.doc.company,
-                    reference_name: frm.doc.name,
-                    tax_accounts: tax_accounts,
-                    tax_rates: tax_rates
-                },
-                callback: function(response) {
-                    if (response.message) {
-                        frappe.msgprint(__("Debit note created successfully"))
-                    } else {
-                        frappe.msgprint(__("Debit note creation failed"))
+            if (values.rebate_amount <= frm.doc.total) {
+                frappe.call({
+                    method: 'spollex.utils.create_debit_note',
+                    args: {
+                        party : frm.doc.supplier,
+                        rebate_amount : values.rebate_amount,
+                        posting_date : values.posting_date,
+                        company: frm.doc.company,
+                        reference_name: frm.doc.name,
+                        tax_accounts: tax_accounts,
+                        tax_rates: tax_rates
+                    },
+                    callback: function(response) {
+                        if (response.message) {
+                            frappe.msgprint(__("Debit note created successfully"))
+                        } else {
+                            frappe.msgprint(__("Debit note creation failed"))
+                        }
+                        d.hide();
                     }
-                    d.hide();
-                }
-            })
+                })
+            } else {
+                frappe.msgprint(__("The rebate amount cannot exceed the total invoice amount"))
+            }
         }
     })
     d.show();

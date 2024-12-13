@@ -55,6 +55,12 @@ let post_sales_credit_note = async function(frm) {
             label: 'Rebate Amount',
             fieldname: 'rebate_amount',
             fieldtype: 'Currency'
+        },
+        {
+            label: 'Posting Date',
+            fieldname: 'posting_date',
+            fieldtype: 'Date',
+            default: frm.doc.posting_date
         }
     ];
     let tax_rates = [];
@@ -95,26 +101,30 @@ let post_sales_credit_note = async function(frm) {
         fields: fields,
         primary_action_label: "Create Credit Note",
         primary_action: function(values) {
-            console.log(tax_rates)
-            frappe.call({
-                method: 'spollex.utils.create_credit_note',
-                args: {
-                    party : frm.doc.customer,
-                    rebate_amount : values.rebate_amount,
-                    company: frm.doc.company,
-                    reference_name: frm.doc.name,
-                    tax_accounts: tax_accounts,
-                    tax_rates: tax_rates
-                },
-                callback: function(response) {
-                    if (response.message) {
-                        frappe.msgprint(__("Credit note created successfully"))
-                    } else {
-                        frappe.msgprint(__("Credit note creation failed"))
+            if (values.rebate_amount <= frm.doc.total) {
+                frappe.call({
+                    method: 'spollex.utils.create_credit_note',
+                    args: {
+                        party : frm.doc.customer,
+                        rebate_amount : values.rebate_amount,
+                        posting_date : values.posting_date,
+                        company: frm.doc.company,
+                        reference_name: frm.doc.name,
+                        tax_accounts: tax_accounts,
+                        tax_rates: tax_rates
+                    },
+                    callback: function(response) {
+                        if (response.message) {
+                            frappe.msgprint(__("Credit note created successfully"))
+                        } else {
+                            frappe.msgprint(__("Credit note creation failed"))
+                        }
+                        d.hide();
                     }
-                    d.hide();
-                }
-            })
+                });
+            } else {
+                frappe.msgprint(__("The rebate amount cannot exceed the total invoice amount"))
+            }
         }
     })
     d.show();

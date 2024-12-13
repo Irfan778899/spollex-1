@@ -5,7 +5,7 @@ import frappe
 import json
 
 @frappe.whitelist()
-def create_credit_note(party, rebate_amount, company, reference_name, tax_accounts, tax_rates):
+def create_credit_note(party, rebate_amount, posting_date, company, reference_name, tax_accounts, tax_rates):
 
     rebate_amount = float(rebate_amount)
 
@@ -15,7 +15,7 @@ def create_credit_note(party, rebate_amount, company, reference_name, tax_accoun
     journal_entry = frappe.new_doc("Journal Entry")
 
     journal_entry.voucher_type = "Credit Note"
-    journal_entry.posting_date = frappe.utils.nowdate()
+    journal_entry.posting_date = posting_date
 
     credit_account = frappe.get_cached_value("Company", company, "default_receivable_account")
 
@@ -83,7 +83,7 @@ def create_credit_note(party, rebate_amount, company, reference_name, tax_accoun
     return journal_entry
 
 @frappe.whitelist()
-def create_debit_note(party, rebate_amount, company, reference_name, tax_accounts, tax_rates):
+def create_debit_note(party, rebate_amount, posting_date, company, reference_name, tax_accounts, tax_rates):
 
     rebate_amount = float(rebate_amount)
 
@@ -93,7 +93,7 @@ def create_debit_note(party, rebate_amount, company, reference_name, tax_account
     journal_entry = frappe.new_doc("Journal Entry")
 
     journal_entry.voucher_type = "Debit Note"
-    journal_entry.posting_date = frappe.utils.nowdate()
+    journal_entry.posting_date = posting_date
 
     debit_account = frappe.get_cached_value("Company", company, "default_payable_account")
 
