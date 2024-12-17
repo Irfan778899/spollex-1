@@ -5,12 +5,17 @@ import frappe
 import json
 
 @frappe.whitelist()
-def create_credit_note(party, rebate_amount, posting_date, company, reference_name, tax_accounts, tax_rates):
+def create_credit_note(rebate_amount, posting_date, reference_name):
+    sales_invoice = frappe.get_doc("Sales Invoice", reference_name)
+    company = sales_invoice.get("company")
 
     rebate_amount = float(rebate_amount)
 
-    tax_accounts = json.loads(tax_accounts)
-    tax_rates = json.loads(tax_rates)
+    currency = sales_invoice.get("currency")
+    conversion_rate = sales_invoice.get("conversion_rate")
+
+    if currency != frappe.get_cached_value("Company", company, "default_currency") and conversion_rate:
+        rebate_amount = rebate_amount * conversion_rate
 
     journal_entry = frappe.new_doc("Journal Entry")
 
@@ -23,15 +28,37 @@ def create_credit_note(party, rebate_amount, posting_date, company, reference_na
 
     party_type = "Customer"
 
+    party = sales_invoice.get("customer")
+
     total_tax_amount = 0
+    vat_entries = []
 
-    for i in range(len(tax_accounts)):
-        tax_account = tax_accounts[i]
-        tax_rate = float(tax_rates[i])
+    tax_rows = sales_invoice.get("taxes")
 
-        tax_amount = rebate_amount * tax_rate / 100
-        total_tax_amount += tax_amount
+    for row in tax_rows:
+        tax_rate = None
 
+        if row.rate:
+            tax_rate = float(row.rate)
+        elif row.account_head and row.charge_type == "On Net Total":
+            tax_rate = frappe.get_value("Account", row.account_head, "tax_rate")
+            if tax_rate is None:
+                frappe.throw(f"Failed to fetch tax rate for account: {row.account_head}")
+
+        if tax_rate:
+            tax_amount = rebate_amount * tax_rate / 100
+            total_tax_amount += tax_amount
+
+            if row.account_head and tax_amount > 0:
+                vat_entries.append(
+                    {
+                        "account": row.account_head,
+                        "party_type": "",
+                        "party": "",
+                        "debit_in_account_currency": tax_amount,
+                        "credit_in_account_currency": 0,
+                    }
+                )
 
     credit_amount = rebate_amount + total_tax_amount
 
@@ -59,23 +86,8 @@ def create_credit_note(party, rebate_amount, posting_date, company, reference_na
         },
     )
 
-    for i in range(len(tax_accounts)):
-        tax_account = tax_accounts[i]
-        tax_rate = float(tax_rates[i])
-
-        tax_amount = rebate_amount * tax_rate / 100
-
-        if tax_account and tax_amount > 0:
-            journal_entry.append(
-                "accounts",
-                {
-                    "account": tax_account,
-                    "party_type": "",
-                    "party": "",
-                    "debit_in_account_currency": tax_amount,
-                    "credit_in_account_currency": 0,
-                },
-            )
+    for vat_entry in vat_entries:
+        journal_entry.append("accounts", vat_entry)
 
     journal_entry.save()
     journal_entry.submit()
@@ -83,12 +95,16 @@ def create_credit_note(party, rebate_amount, posting_date, company, reference_na
     return journal_entry
 
 @frappe.whitelist()
-def create_debit_note(party, rebate_amount, posting_date, company, reference_name, tax_accounts, tax_rates):
+def create_debit_note(rebate_amount, posting_date, reference_name):
+    purchase_invoice = frappe.get_doc("Purchase Invoice", reference_name)
+    company = purchase_invoice.get("company")
 
     rebate_amount = float(rebate_amount)
+    currency = purchase_invoice.get("currency")
+    conversion_rate = purchase_invoice.get("conversion_rate")
 
-    tax_accounts = json.loads(tax_accounts)
-    tax_rates = json.loads(tax_rates)
+    if currency != frappe.get_cached_value("Company", company, "default_currency") and conversion_rate:
+        rebate_amount = rebate_amount * conversion_rate
 
     journal_entry = frappe.new_doc("Journal Entry")
 
@@ -100,15 +116,35 @@ def create_debit_note(party, rebate_amount, posting_date, company, reference_nam
     credit_account = frappe.get_cached_value("Account", {"account_name": "Rebate Received"}, "name")
 
     party_type = "Supplier"
+    party = purchase_invoice.get("supplier")
 
     total_tax_amount = 0
+    vat_entries = []
 
-    for i in range(len(tax_accounts)):
-        tax_account = tax_accounts[i]
-        tax_rate = float(tax_rates[i])
+    tax_rows = purchase_invoice.get("taxes")
+    for row in tax_rows:
+        tax_rate = None
+        if row.rate:
+            tax_rate = float(row.rate)
+        elif row.account_head and row.charge_type == "On Net Total":
+            tax_rate = frappe.get_value("Account", row.account_head, "tax_rate")
+            if tax_rate is None:
+                frappe.throw(f"Failed to fetch tax rate for account: {row.account_head}")
 
-        tax_amount = rebate_amount * tax_rate / 100
-        total_tax_amount += tax_amount
+        if tax_rate:
+            tax_amount = rebate_amount * tax_rate / 100
+            total_tax_amount += tax_amount
+
+            if row.account_head and tax_amount > 0:
+                vat_entries.append(
+                    {
+                        "account": row.account_head,
+                        "party_type": "",
+                        "party": "",
+                        "debit_in_account_currency": 0,
+                        "credit_in_account_currency": tax_amount,
+                    }
+                )
 
 
     debit_amount = rebate_amount + total_tax_amount
@@ -137,23 +173,8 @@ def create_debit_note(party, rebate_amount, posting_date, company, reference_nam
         },
     )
 
-    for i in range(len(tax_accounts)):
-        tax_account = tax_accounts[i]
-        tax_rate = float(tax_rates[i])
-
-        tax_amount = rebate_amount * tax_rate / 100
-
-        if tax_account and tax_amount > 0:
-            journal_entry.append(
-                "accounts",
-                {
-                    "account": tax_account,
-                    "party_type": "",
-                    "party": "",
-                    "debit_in_account_currency": 0,
-                    "credit_in_account_currency": tax_amount,
-                },
-            )
+    for vat_entry in vat_entries:
+        journal_entry.append("accounts", vat_entry)
 
     journal_entry.save()
     journal_entry.submit()
