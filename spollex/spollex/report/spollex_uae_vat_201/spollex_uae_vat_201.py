@@ -1,0 +1,617 @@
+# Copyright (c) 2024, 4C Solutions and contributors
+# For license information, please see license.txt
+
+import frappe
+from frappe import _
+
+
+def execute(filters=None):
+	columns = get_columns()
+	data, emirates, amounts_by_emirate = get_data(filters)
+	return columns, data
+
+
+def get_columns():
+	"""Creates a list of dictionaries that are used to generate column headers of the data table."""
+	return [
+		{"fieldname": "no", "label": _("No"), "fieldtype": "Data", "width": 50},
+		{"fieldname": "legend", "label": _("Legend"), "fieldtype": "Data", "width": 300},
+		{
+			"fieldname": "amount",
+			"label": _("Amount (AED)"),
+			"fieldtype": "Currency",
+			"width": 125,
+		},
+		{
+			"fieldname": "vat_amount",
+			"label": _("VAT Amount (AED)"),
+			"fieldtype": "Currency",
+			"width": 150,
+		},
+	]
+
+
+def get_data(filters=None):
+	"""Returns the list of dictionaries. Each dictionary is a row in the datatable and chart data."""
+	data = []
+	emirates, amounts_by_emirate = append_vat_on_sales(data, filters)
+	append_vat_on_expenses(data, filters)
+	return data, emirates, amounts_by_emirate
+
+
+def append_vat_on_sales(data, filters):
+	"""Appends Sales and All Other Outputs."""
+	append_data(data, "", _("VAT on Sales and All Other Outputs"), "", "")
+
+	emirates, amounts_by_emirate = standard_rated_expenses_emiratewise(data, filters)
+
+	append_data(
+		data,
+		"2",
+		_("Tax Refunds provided to Tourists under the Tax Refunds for Tourists Scheme"),
+		frappe.format((-1) * get_tourist_tax_return_total(filters), "Currency"),
+		frappe.format((-1) * get_tourist_tax_return_tax(filters), "Currency"),
+	)
+
+	append_data(
+		data,
+		"3",
+		_("Supplies subject to the reverse charge provision"),
+		frappe.format(get_reverse_charge_total(filters), "Currency"),
+		frappe.format(get_reverse_charge_tax(filters), "Currency"),
+	)
+
+	append_data(data, "4", _("Zero Rated"), frappe.format(get_zero_rated_total(filters), "Currency"), "-")
+
+	append_data(data, "5", _("Exempt Supplies"), frappe.format(get_exempt_total(filters), "Currency"), "-")
+
+	append_data(data, "", "", "", "")
+
+	return emirates, amounts_by_emirate
+
+
+def standard_rated_expenses_emiratewise(data, filters):
+	"""Append emiratewise standard rated expenses and vat."""
+	total_emiratewise = get_total_emiratewise(filters)
+	emirates = get_emirates()
+	amounts_by_emirate = {}
+	for emirate, amount, vat in total_emiratewise:
+		amounts_by_emirate[emirate] = {
+			"legend": emirate,
+			"raw_amount": amount,
+			"raw_vat_amount": vat,
+			"amount": frappe.format(amount, "Currency"),
+			"vat_amount": frappe.format(vat, "Currency"),
+		}
+	amounts_by_emirate = append_emiratewise_expenses(data, emirates, amounts_by_emirate)
+	return emirates, amounts_by_emirate
+
+
+def append_emiratewise_expenses(data, emirates, amounts_by_emirate):
+	"""Append emiratewise standard rated expenses and vat."""
+	for no, emirate in enumerate(emirates, 97):
+		if emirate in amounts_by_emirate:
+			amounts_by_emirate[emirate]["no"] = _("1{0}").format(chr(no))
+			amounts_by_emirate[emirate]["legend"] = _("Standard rated supplies in {0}").format(emirate)
+			data.append(amounts_by_emirate[emirate])
+		else:
+			append_data(
+				data,
+				_("1{0}").format(chr(no)),
+				_("Standard rated supplies in {0}").format(emirate),
+				frappe.format(0, "Currency"),
+				frappe.format(0, "Currency"),
+			)
+	return amounts_by_emirate
+
+
+def append_vat_on_expenses(data, filters):
+	"""Appends Expenses and All Other Inputs."""
+	append_data(data, "", _("VAT on Expenses and All Other Inputs"), "", "")
+	total_debit_amount, total_debit_vat = get_debit_note_data(filters)
+	total_taxable_amount, total_vat = get_vat_debit_totals(filters)
+	append_data(
+		data,
+		"9",
+		_("Standard Rated Expenses"),
+		frappe.format(get_standard_rated_expenses_total(filters) - total_debit_amount + total_taxable_amount, "Currency"),
+		frappe.format(get_standard_rated_expenses_tax(filters) - total_debit_vat + total_vat, "Currency"),
+	)
+	append_data(
+		data,
+		"10",
+		_("Supplies subject to the reverse charge provision"),
+		frappe.format(get_reverse_charge_recoverable_total(filters), "Currency"),
+		frappe.format(get_reverse_charge_recoverable_tax(filters), "Currency"),
+	)
+
+
+def append_data(data, no, legend, amount, vat_amount):
+	"""Returns data with appended value."""
+	data.append({"no": no, "legend": legend, "amount": amount, "vat_amount": vat_amount})
+
+
+def get_total_emiratewise(filters):
+	"""Returns Emiratewise Amount and Taxes."""
+	conditions = get_conditions(filters)
+	try:
+		sales_data = frappe.db.sql(
+			f"""
+			select
+				s.vat_emirate as emirate, sum(i.base_net_amount) as total, sum(i.tax_amount)
+			from
+				`tabSales Invoice Item` i inner join `tabSales Invoice` s
+			on
+				i.parent = s.name
+			where
+				s.docstatus = 1 and  i.is_exempt != 1 and i.is_zero_rated != 1 and i.tax_amount != 0
+				{conditions}
+			group by
+				s.vat_emirate;
+			""",
+			filters,
+		)
+	
+		credit_note_data = get_credit_note_data(filters)
+
+		# Aggregate sales and credit note data
+		return aggregate_emiratewise_data(sales_data, credit_note_data)
+
+	except (IndexError, TypeError):
+		return 0
+
+
+def get_emirates():
+	"""Returns a List of emirates in the order that they are to be displayed."""
+	return ["Abu Dhabi", "Dubai", "Sharjah", "Ajman", "Umm Al Quwain", "Ras Al Khaimah", "Fujairah"]
+
+
+def get_filters(filters):
+	"""The conditions to be used to filter data to calculate the total sale."""
+	query_filters = []
+	if filters.get("company"):
+		query_filters.append(["company", "=", filters["company"]])
+	if filters.get("from_date"):
+		query_filters.append(["posting_date", ">=", filters["from_date"]])
+	if filters.get("from_date"):
+		query_filters.append(["posting_date", "<=", filters["to_date"]])
+	return query_filters
+
+
+def get_reverse_charge_total(filters):
+	"""Returns the sum of the total of each Purchase invoice made."""
+	query_filters = get_filters(filters)
+	query_filters.append(["reverse_charge", "=", "Y"])
+	query_filters.append(["docstatus", "=", 1])
+	try:
+		return (
+			frappe.db.get_all(
+				"Purchase Invoice", filters=query_filters, fields=["sum(total)"], as_list=True, limit=1
+			)[0][0]
+			or 0
+		)
+	except (IndexError, TypeError):
+		return 0
+
+
+def get_reverse_charge_tax(filters):
+	"""Returns the sum of the tax of each Purchase invoice made."""
+	conditions = get_conditions_join(filters)
+	return (
+		frappe.db.sql(
+			f"""
+		select sum(debit)  from
+			`tabPurchase Invoice` p inner join `tabGL Entry` gl
+		on
+			gl.voucher_no =  p.name
+		where
+			p.reverse_charge = "Y"
+			and p.docstatus = 1
+			and gl.docstatus = 1
+			and account in (select account from `tabUAE VAT Account` where  parent=%(company)s)
+			{conditions} ;
+		""",
+			filters,
+		)[0][0]
+		or 0
+	)
+
+
+def get_reverse_charge_recoverable_total(filters):
+	"""Returns the sum of the total of each Purchase invoice made with recoverable reverse charge."""
+	query_filters = get_filters(filters)
+	query_filters.append(["reverse_charge", "=", "Y"])
+	query_filters.append(["recoverable_reverse_charge", ">", "0"])
+	query_filters.append(["docstatus", "=", 1])
+	try:
+		return (
+			frappe.db.get_all(
+				"Purchase Invoice", filters=query_filters, fields=["sum(total)"], as_list=True, limit=1
+			)[0][0]
+			or 0
+		)
+	except (IndexError, TypeError):
+		return 0
+
+
+def get_reverse_charge_recoverable_tax(filters):
+	"""Returns the sum of the tax of each Purchase invoice made."""
+	conditions = get_conditions_join(filters)
+	return (
+		frappe.db.sql(
+			f"""
+		select
+			sum(debit * p.recoverable_reverse_charge / 100)
+		from
+			`tabPurchase Invoice` p  inner join `tabGL Entry` gl
+		on
+			gl.voucher_no = p.name
+		where
+			p.reverse_charge = "Y"
+			and p.docstatus = 1
+			and p.recoverable_reverse_charge > 0
+			and gl.docstatus = 1
+			and account in (select account from `tabUAE VAT Account` where  parent=%(company)s)
+			{conditions} ;
+		""",
+			filters,
+		)[0][0]
+		or 0
+	)
+
+
+def get_conditions_join(filters):
+	"""The conditions to be used to filter data to calculate the total vat."""
+	conditions = ""
+	for opts in (
+		("company", " and p.company=%(company)s"),
+		("from_date", " and p.posting_date>=%(from_date)s"),
+		("to_date", " and p.posting_date<=%(to_date)s"),
+	):
+		if filters.get(opts[0]):
+			conditions += opts[1]
+	return conditions
+
+
+def get_standard_rated_expenses_total(filters):
+	"""Returns the sum of the total of each Purchase invoice made with recoverable reverse charge."""
+	query_filters = get_filters(filters)
+	query_filters.append(["recoverable_standard_rated_expenses", "!=", 0])
+	query_filters.append(["docstatus", "=", 1])
+	try:
+		return (
+			frappe.db.get_all(
+				"Purchase Invoice", filters=query_filters, fields=["sum(total)"], as_list=True, limit=1
+			)[0][0]
+			or 0
+		)
+	except (IndexError, TypeError):
+		return 0
+
+
+def get_standard_rated_expenses_tax(filters):
+	"""Returns the sum of the tax of each Purchase invoice made."""
+	query_filters = get_filters(filters)
+	query_filters.append(["recoverable_standard_rated_expenses", "!=", 0])
+	query_filters.append(["docstatus", "=", 1])
+	try:
+		return (
+			frappe.db.get_all(
+				"Purchase Invoice",
+				filters=query_filters,
+				fields=["sum(recoverable_standard_rated_expenses)"],
+				as_list=True,
+				limit=1,
+			)[0][0]
+			or 0
+		)
+	except (IndexError, TypeError):
+		return 0
+
+
+def get_tourist_tax_return_total(filters):
+	"""Returns the sum of the total of each Sales invoice with non zero tourist_tax_return."""
+	query_filters = get_filters(filters)
+	query_filters.append(["tourist_tax_return", ">", 0])
+	query_filters.append(["docstatus", "=", 1])
+	try:
+		return (
+			frappe.db.get_all(
+				"Sales Invoice", filters=query_filters, fields=["sum(total)"], as_list=True, limit=1
+			)[0][0]
+			or 0
+		)
+	except (IndexError, TypeError):
+		return 0
+
+
+def get_tourist_tax_return_tax(filters):
+	"""Returns the sum of the tax of each Sales invoice with non zero tourist_tax_return."""
+	query_filters = get_filters(filters)
+	query_filters.append(["tourist_tax_return", ">", 0])
+	query_filters.append(["docstatus", "=", 1])
+	try:
+		return (
+			frappe.db.get_all(
+				"Sales Invoice",
+				filters=query_filters,
+				fields=["sum(tourist_tax_return)"],
+				as_list=True,
+				limit=1,
+			)[0][0]
+			or 0
+		)
+	except (IndexError, TypeError):
+		return 0
+
+
+def get_zero_rated_total(filters):
+	"""Returns the sum of each Sales Invoice Item Amount which is zero rated."""
+	conditions = get_conditions(filters)
+	try:
+		return (
+			frappe.db.sql(
+				f"""
+			select
+				sum(i.base_net_amount) as total
+			from
+				`tabSales Invoice Item` i inner join `tabSales Invoice` s
+			on
+				i.parent = s.name
+			where
+				s.docstatus = 1 and  i.is_zero_rated = 1
+				{conditions} ;
+			""",
+				filters,
+			)[0][0]
+			or 0
+		)
+	except (IndexError, TypeError):
+		return 0
+
+
+def get_exempt_total(filters):
+	"""Returns the sum of each Sales Invoice Item Amount which is Vat Exempt."""
+	conditions = get_conditions(filters)
+	try:
+		return (
+			frappe.db.sql(
+				f"""
+			select
+				sum(i.base_net_amount) as total
+			from
+				`tabSales Invoice Item` i inner join `tabSales Invoice` s
+			on
+				i.parent = s.name
+			where
+				s.docstatus = 1 and  (i.is_exempt = 1 or i.tax_amount = 0 ) and  i.is_zero_rated != 1
+				{conditions} ;
+			""",
+				filters,
+			)[0][0]
+			or 0
+		)
+	except (IndexError, TypeError):
+		return 0
+
+
+def get_conditions(filters):
+	"""The conditions to be used to filter data to calculate the total sale."""
+	conditions = ""
+	for opts in (
+		("company", " and company=%(company)s"),
+		("from_date", " and posting_date>=%(from_date)s"),
+		("to_date", " and posting_date<=%(to_date)s"),
+	):
+		if filters.get(opts[0]):
+			conditions += opts[1]
+	return conditions
+
+def get_credit_note_data(filters):
+	"""Fetch and process credit note data, excluding those without VAT accounts."""
+	credit_notes = frappe.get_all(
+		"Journal Entry",
+		filters={
+			"voucher_type": "Credit Note",
+			"docstatus": 1,
+			"posting_date": ["between", [filters.get("from_date"), filters.get("to_date")]],
+		},
+		fields=["name"]
+	)
+
+	if not credit_notes:
+		return []
+
+	# Fetch VAT accounts associated with the credit notes
+	vat_accounts = frappe.get_all(
+		"Journal Entry Account",
+		filters={
+			"parent": ["in", [cn["name"] for cn in credit_notes]],
+			"account": ["like", "VAT%"],
+			"debit": [">", 0]
+		},
+		fields=["parent", "debit"]
+	)
+
+	# Only keep credit notes with VAT entries
+	valid_credit_notes = {vat["parent"] for vat in vat_accounts}
+
+	credit_note_accounts = frappe.get_all(
+		"Journal Entry Account",
+		filters={"parent": ["in", list(valid_credit_notes)]},
+		fields=["parent", "reference_name", "account", "account_type", "credit", "debit"]
+	)
+
+	journal_entry_map = {}
+	for account in credit_note_accounts:
+		je_name = account["parent"]
+		if je_name not in journal_entry_map:
+			journal_entry_map[je_name] = {
+				"sales_invoice": None,
+				"total_with_vat": 0.0,
+				"vat": 0.0,
+			}
+
+		# Accumulate VAT and total with VAT
+		if account["account_type"] == "Receivable":
+			journal_entry_map[je_name]["sales_invoice"] = account["reference_name"]
+			journal_entry_map[je_name]["total_with_vat"] += account["credit"] or 0.0
+		elif "VAT" in account["account"]:
+			journal_entry_map[je_name]["vat"] += account["debit"] or 0.0
+
+	emirates_data = {}
+	for je_name, data in journal_entry_map.items():
+		sales_invoice = data["sales_invoice"]
+		if not sales_invoice:
+			continue  # Skip if no linked Sales Invoice
+
+		# Fetch emirate for the linked sales invoice
+		emirate = frappe.get_value("Sales Invoice", sales_invoice, "vat_emirate")
+		if not emirate:
+			continue  # Skip if emirate is undefined
+
+		total_with_vat = data["total_with_vat"]
+		vat = data["vat"]
+
+		# Calculate taxable amount (total_with_vat - vat)
+		taxable_amount = total_with_vat - vat
+
+		# Update emirate-wise totals
+		if emirate not in emirates_data:
+			emirates_data[emirate] = {"total": 0.0, "vat": 0.0}
+		emirates_data[emirate]["total"] += taxable_amount
+		emirates_data[emirate]["vat"] += vat
+
+	return [
+		(emirate, data["total"], data["vat"])
+		for emirate, data in emirates_data.items()
+	]
+
+def aggregate_emiratewise_data(sales_data, credit_note_data):
+	"""Aggregates sales and credit notes data emirate-wise."""
+	emirates_data = {row[0]: {"total": row[1], "vat": row[2]} for row in sales_data}
+
+	for row in credit_note_data:
+		emirate, total, vat = row
+		if emirate in emirates_data:
+			emirates_data[emirate]["total"] -= total
+			emirates_data[emirate]["vat"] -= vat
+		else:
+			emirates_data[emirate] = {"total": -total, "vat": -vat}
+
+	return [
+		(emirate, data["total"], data["vat"])
+		for emirate, data in emirates_data.items()
+	]
+
+def get_debit_note_data(filters):
+	"""Fetch and process debit note data, excluding those without VAT accounts."""
+	debit_notes = frappe.get_all(
+		"Journal Entry",
+		filters={
+			"voucher_type": "Debit Note",
+			"docstatus": 1,
+			"posting_date": ["between", [filters.get("from_date"), filters.get("to_date")]],
+		},
+		fields=["name"]
+	)
+
+	if not debit_notes:
+		return 0, 0
+
+	# Fetch VAT accounts associated with the debit notes
+	vat_accounts = frappe.get_all(
+		"Journal Entry Account",
+		filters={
+			"parent": ["in", [dn["name"] for dn in debit_notes]],
+			"account": ["like", "VAT%"],
+			"credit": [">", 0]
+		},
+		fields=["parent", "credit"]
+	)
+
+	# Only keep debit notes with VAT entries
+	valid_debit_notes = {vat["parent"] for vat in vat_accounts}
+
+	debit_note_accounts = frappe.get_all(
+		"Journal Entry Account",
+		filters={"parent": ["in", list(valid_debit_notes)]},
+		fields=["parent", "reference_name", "account", "account_type", "credit", "debit"]
+	)
+
+	journal_entry_map = {}
+	for account in debit_note_accounts:
+		je_name = account["parent"]
+		if je_name not in journal_entry_map:
+			journal_entry_map[je_name] = {
+				"purchase_invoice": None,
+				"total_with_vat": 0.0,
+				"vat": 0.0,
+			}
+
+		# Accumulate VAT and total with VAT
+		if account["account_type"] == "Payable":
+			journal_entry_map[je_name]["purchase_invoice"] = account["reference_name"]
+			journal_entry_map[je_name]["total_with_vat"] += account["debit"] or 0.0
+		elif "VAT" in account["account"]:
+			journal_entry_map[je_name]["vat"] += account["credit"] or 0.0
+
+	total_debit_amount = total_vat = 0
+	for je_name, data in journal_entry_map.items():
+		purchase_invoice = data["purchase_invoice"]
+		if not purchase_invoice:
+			continue  # Skip if no linked Purchase Invoice
+
+		# Calculate taxable amount (total_with_vat - vat)
+		taxable_amount = data["total_with_vat"] - data["vat"]
+
+		total_debit_amount += taxable_amount
+		total_vat += data["vat"]
+
+	return total_debit_amount, total_vat
+
+def get_vat_debit_totals(filters):
+	"""
+	Fetch the total VAT debit and the total taxable amount for which this VAT (5%) debit has occurred.
+	Excludes journal entries associated with credit notes and debit notes.
+	"""
+	journal_entries = frappe.get_all(
+		"Journal Entry",
+		filters={
+			"voucher_type": ["not in", ["Credit Note", "Debit Note"]],
+			"docstatus": 1,
+			"posting_date": ["between", [filters.get("from_date"), filters.get("to_date")]],
+		},
+		fields=["name"]
+	)
+
+	if not journal_entries:
+		return 0, 0
+
+	journal_entry_names = [je["name"] for je in journal_entries]
+
+	vat_entries = frappe.get_all(
+		"Journal Entry Account",
+		filters={
+			"parent": ["in", journal_entry_names],
+			"account": ["like", "VAT%"],  # Match VAT accounts
+			"debit": [">", 0],
+		},
+		fields=["parent", "debit"]
+	)
+
+	if not vat_entries:
+		return 0, 0
+
+	journal_entry_vat_map = {}
+	for entry in vat_entries:
+		je_name = entry["parent"]
+		if je_name not in journal_entry_vat_map:
+			journal_entry_vat_map[je_name] = {"vat": 0.0, "taxable_amount": 0.0}
+		journal_entry_vat_map[je_name]["vat"] += entry["debit"]
+		journal_entry_vat_map[je_name]["taxable_amount"] += (entry["debit"] * 20)
+
+	total_vat = sum(entry["vat"] for entry in journal_entry_vat_map.values())
+	total_taxable_amount = sum(entry["taxable_amount"] for entry in journal_entry_vat_map.values())
+
+	return total_taxable_amount, total_vat
