@@ -151,9 +151,9 @@ def get_total_emiratewise(filters):
 			""",
 			filters,
 		)
-	
+		frappe.log_error(title="Emiratewise Sales Data", message=f"{sales_data}")
 		credit_note_data = get_credit_note_data(filters)
-
+		frappe.log_error(title="Emiratewise Sales Data", message=f"{sales_data}")
 		# Aggregate sales and credit note data
 		return aggregate_emiratewise_data(sales_data, credit_note_data)
 
@@ -427,7 +427,7 @@ def get_credit_note_data(filters):
 		"Journal Entry Account",
 		filters={
 			"parent": ["in", [cn["name"] for cn in credit_notes]],
-			"account": ["like", "VAT%"],
+			"account": ["like", "%VAT%"],
 			"debit": [">", 0]
 		},
 		fields=["parent", "debit"]
@@ -524,7 +524,7 @@ def get_debit_note_data(filters):
 		"Journal Entry Account",
 		filters={
 			"parent": ["in", [dn["name"] for dn in debit_notes]],
-			"account": ["like", "VAT%"],
+			"account": ["like", "%VAT%"],
 			"credit": [">", 0]
 		},
 		fields=["parent", "credit"]
@@ -594,7 +594,7 @@ def get_vat_debit_totals(filters):
 		"Journal Entry Account",
 		filters={
 			"parent": ["in", journal_entry_names],
-			"account": ["like", "VAT%"],  # Match VAT accounts
+			"account": ["like", "%VAT%"],  # Match VAT accounts
 			"debit": [">", 0],
 		},
 		fields=["parent", "debit"]
