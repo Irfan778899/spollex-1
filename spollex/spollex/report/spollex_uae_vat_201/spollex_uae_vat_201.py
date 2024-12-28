@@ -3,7 +3,10 @@
 
 import frappe
 from frappe import _
+from frappe.utils import (flt)
 
+total_sales_amount = total_sales_vat_amount = 0
+total_purchase_amount = total_purchase_vat_amount = 0
 
 def execute(filters=None):
 	columns = get_columns()
@@ -34,8 +37,14 @@ def get_columns():
 def get_data(filters=None):
 	"""Returns the list of dictionaries. Each dictionary is a row in the datatable and chart data."""
 	data = []
+	global total_sales_vat_amount, total_purchase_vat_amount
 	emirates, amounts_by_emirate = append_vat_on_sales(data, filters)
 	append_vat_on_expenses(data, filters)
+	append_data(data, "", "", "", "")
+	append_data(data, "", _("Net VAT Due"), "", "")
+	append_data(data, "12", _("Total Value of due tax for the period"), frappe.format(total_sales_vat_amount, "Currency"), "")
+	append_data(data, "13", _("Total Value of recoverable tax for the period"), frappe.format(total_purchase_vat_amount, "Currency"), "")
+	append_data(data, "14", _("Net VAT due(or reclaimed) for the period"), frappe.format(total_sales_vat_amount-total_purchase_vat_amount, "Currency"), "")
 	return data, emirates, amounts_by_emirate
 
 
@@ -53,17 +62,28 @@ def append_vat_on_sales(data, filters):
 		frappe.format((-1) * get_tourist_tax_return_tax(filters), "Currency"),
 	)
 
-	append_data(
-		data,
-		"3",
-		_("Supplies subject to the reverse charge provision"),
-		frappe.format(get_reverse_charge_total(filters), "Currency"),
-		frappe.format(get_reverse_charge_tax(filters), "Currency"),
-	)
+	append_data(data, "3", _("Supplies subject to the reverse charge provision"), "-", "-")
 
 	append_data(data, "4", _("Zero Rated"), frappe.format(get_zero_rated_total(filters), "Currency"), "-")
 
 	append_data(data, "5", _("Exempt Supplies"), frappe.format(get_exempt_total(filters), "Currency"), "-")
+
+	append_data(
+		data,
+		"6",
+		_("Goods imported into UAE"),
+		frappe.format(get_reverse_charge_total(filters), "Currency"),
+		frappe.format(get_reverse_charge_tax(filters), "Currency"),
+	)
+
+	append_data(data, "7", _("Adjustments to goods imported into UAE"), "-", "-")
+
+	global total_sales_amount, total_sales_vat_amount
+	for row in data:
+		total_sales_amount += flt(row.get("amount"))
+		total_sales_vat_amount += flt(row.get("vat_amount"))
+
+	append_data(data, "8", _("Totals"), frappe.format(total_sales_amount, "Currency"), frappe.format(total_sales_vat_amount, "Currency"))
 
 	append_data(data, "", "", "", "")
 
@@ -110,20 +130,29 @@ def append_vat_on_expenses(data, filters):
 	append_data(data, "", _("VAT on Expenses and All Other Inputs"), "", "")
 	total_debit_amount, total_debit_vat = get_debit_note_data(filters)
 	total_taxable_amount, total_vat = get_vat_debit_totals(filters)
+	standard_rated_purchase_amount = get_standard_rated_expenses_total(filters)
+	standard_rated_purchase_tax_amount = get_standard_rated_expenses_tax(filters)
+	standard_rated_reverse_purchase_amount = get_reverse_charge_recoverable_total(filters)
+	standard_rated_reverse_purchase_tax_amount = get_reverse_charge_recoverable_tax(filters)
 	append_data(
 		data,
 		"9",
 		_("Standard Rated Expenses"),
-		frappe.format(get_standard_rated_expenses_total(filters) - total_debit_amount + total_taxable_amount, "Currency"),
-		frappe.format(get_standard_rated_expenses_tax(filters) - total_debit_vat + total_vat, "Currency"),
+		frappe.format(standard_rated_purchase_amount - total_debit_amount + total_taxable_amount, "Currency"),
+		frappe.format(standard_rated_purchase_tax_amount - total_debit_vat + total_vat, "Currency"),
 	)
 	append_data(
 		data,
 		"10",
 		_("Supplies subject to the reverse charge provision"),
-		frappe.format(get_reverse_charge_recoverable_total(filters), "Currency"),
-		frappe.format(get_reverse_charge_recoverable_tax(filters), "Currency"),
+		frappe.format(standard_rated_reverse_purchase_amount, "Currency"),
+		frappe.format(standard_rated_reverse_purchase_tax_amount, "Currency"),
 	)
+
+	global total_purchase_amount, total_purchase_vat_amount
+	total_purchase_amount = standard_rated_purchase_amount - total_debit_amount + total_taxable_amount + standard_rated_reverse_purchase_amount
+	total_purchase_vat_amount = standard_rated_purchase_tax_amount - total_debit_vat + total_vat + standard_rated_reverse_purchase_tax_amount
+	append_data(data, "11", _("Totals"), frappe.format(total_purchase_amount, "Currency"), frappe.format(total_purchase_vat_amount, "Currency"))
 
 
 def append_data(data, no, legend, amount, vat_amount):

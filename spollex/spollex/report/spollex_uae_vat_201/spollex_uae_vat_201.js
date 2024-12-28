@@ -30,7 +30,8 @@ frappe.query_reports["Spollex UAE VAT 201"] = {
 		if (
 			data &&
 			(data.legend == "VAT on Sales and All Other Outputs" ||
-				data.legend == "VAT on Expenses and All Other Inputs") &&
+				data.legend == "VAT on Expenses and All Other Inputs" ||
+				data.legend == "Net VAT Due") &&
 			data.legend == value
 		) {
 			value = $(`<span>${value}</span>`);
