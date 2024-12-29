@@ -20,6 +20,12 @@ fixtures = [
     }
 ]
 
+company_data_to_be_ignored = [
+    "Department",
+    "UAE VAT Settings",
+    "Tax Rule",
+]
+
 # required_apps = []
 
 # Includes in <head>

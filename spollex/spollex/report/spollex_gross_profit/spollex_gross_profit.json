@@ -9,7 +9,7 @@
  "idx": 0,
  "is_standard": "Yes",
  "letterhead": null,
- "modified": "2024-08-26 14:34:00.940863",
+ "modified": "2024-12-30 00:07:11.961132",
  "modified_by": "Administrator",
  "module": "Spollex",
  "name": "Spollex Gross Profit",
@@ -26,5 +26,6 @@
   {
    "role": "Accounts User"
   }
- ]
+ ],
+ "timeout": 0
 }

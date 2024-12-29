@@ -57,6 +57,8 @@ def execute(filters=None):
 				"base_rate",
 				"buying_rate",
 				"base_amount",
+				"credit_note_total",
+				"base_net_total",
 				"buying_amount",
 				"commission_amount",
 				"incentive_amount",
@@ -194,7 +196,7 @@ def get_columns(group_wise_columns, filters):
 			},
 			"credit_note_total": {
 				"label": _("Credit Note"),
-				"fieldname": "credit_note",
+				"fieldname": "credit_note_total",
 				"fieldtype": "Currency",
 				"options": "currency",
 				"width": 100,
@@ -311,7 +313,7 @@ def get_column_names():
 			"base_rate": "avg._selling_rate",
 			"buying_rate": "valuation_rate",
 			"base_amount": "selling_amount",
-			"credit_note_total": "credit_note",
+			"credit_note_total": "credit_note_total",
 			"base_net_total": "selling_total",
 			"buying_amount": "buying_amount",
 			"commission_amount": "commission_amount",
@@ -353,10 +355,9 @@ class GrossProfitGenerator:
 			buying_amount = 0
 
 		for row in reversed(self.si_list):
-			
 			if self.skip_row(row):
 				continue
-			
+
 			row.base_amount = flt(row.base_net_amount, self.currency_precision)
 
 			product_bundles = []
@@ -406,6 +407,7 @@ class GrossProfitGenerator:
 
 			# calculate gross profit
 			row.base_net_total = flt(row.base_net_total, self.float_precision)
+			row.credit_note_total = flt(row.credit_note_total, self.float_precision)
 			row.commission_amount = flt(row.commission_amount, self.float_precision)
 			row.incentive_amount = flt(row.incentive_amount, self.float_precision)
 			row.gross_profit = flt(row.base_net_total - row.buying_amount - row.commission_amount - row.incentive_amount, self.currency_precision)
@@ -445,6 +447,7 @@ class GrossProfitGenerator:
 							row.buying_amount = flt(
 								flt(row.qty) * flt(row.buying_rate), self.currency_precision
 							)
+
 						if flt(row.qty) or row.base_amount:
 							row = self.set_average_rate(row)
 							self.grouped_data.append(row)
@@ -456,6 +459,8 @@ class GrossProfitGenerator:
 						new_row.qty += flt(row.qty)
 						new_row.buying_amount += flt(row.buying_amount, self.currency_precision)
 						new_row.base_amount += flt(row.base_amount, self.currency_precision)
+						new_row.credit_note_total += flt(row.credit_note_total, self.currency_precision)
+						new_row.base_net_total = flt(new_row.base_amount - new_row.credit_note_total, self.currency_precision)
 						new_row.commission_amount += flt(row.commission_amount, self.currency_precision)
 						new_row.incentive_amount += flt(row.incentive_amount, self.currency_precision)
 				new_row = self.set_average_rate(new_row)
@@ -479,7 +484,7 @@ class GrossProfitGenerator:
 		new_row.gross_profit = flt(new_row.base_net_total - new_row.buying_amount - new_row.commission_amount - new_row.incentive_amount, self.currency_precision)
 		new_row.gross_profit_percent = (
 			flt(((new_row.gross_profit / new_row.base_net_total) * 100.0), self.currency_precision)
-			if new_row.base_amount
+			if new_row.base_net_total
 			else 0
 		)
 
@@ -677,6 +682,8 @@ class GrossProfitGenerator:
 			if warehouse_details:
 				conditions += f" and `tabSales Invoice Item`.warehouse in (select name from `tabWarehouse` wh where wh.lft >= {warehouse_details.lft} and wh.rgt <= {warehouse_details.rgt} and warehouse = wh.name)"
 
+		rebate_account = frappe.get_cached_value("Account", {"account_name": "Rebate Given"}, "name")
+
 		self.si_list = frappe.db.sql(
 			"""
 			select
@@ -696,7 +703,25 @@ class GrossProfitGenerator:
 				`tabSales Invoice`.base_net_total,
 				`tabSales Invoice`.total_commission,
 				(`tabSales Invoice`.total_commission / `tabSales Invoice`.base_net_total) * `tabSales Invoice Item`.base_net_amount as commission_amount,
-				(ifnull(sum(`tabSales Team`.incentives), 0) / `tabSales Invoice`.base_net_total) * `tabSales Invoice Item`.base_net_amount as incentive_amount
+				(ifnull(sum(`tabSales Team`.incentives), 0) / `tabSales Invoice`.base_net_total) * `tabSales Invoice Item`.base_net_amount as incentive_amount,
+				(
+					select
+						sum(`tabJournal Entry Account`.debit_in_account_currency)
+					from
+						`tabJournal Entry Account`
+					where
+						`tabJournal Entry Account`.parent in (
+							select
+								`tabJournal Entry Account`.parent
+							from
+								`tabJournal Entry Account`
+							where
+								`tabJournal Entry Account`.reference_name = `tabSales Invoice`.name
+								and `tabJournal Entry Account`.docstatus = 1
+						)
+						and `tabJournal Entry Account`.account = '{rebate_account}'
+						and `tabJournal Entry Account`.docstatus = 1
+				) * (`tabSales Invoice Item`.base_net_amount / `tabSales Invoice`.base_net_total) as credit_note_total
 			from
 				`tabSales Invoice` inner join `tabSales Invoice Item`
 					on `tabSales Invoice Item`.parent = `tabSales Invoice`.name
@@ -711,6 +736,7 @@ class GrossProfitGenerator:
 				`tabSales Invoice`.posting_date desc, `tabSales Invoice`.posting_time desc""".format(
 				conditions=conditions,
 				match_cond=get_match_cond("Sales Invoice"),
+				rebate_account=rebate_account,
 			),
 			self.filters,
 			as_dict=1,
@@ -743,7 +769,6 @@ class GrossProfitGenerator:
 		"""
 		Turns list of Sales Invoice Items to a tree of Sales Invoices with their Items as children.
 		"""
-
 		grouped = OrderedDict()
 
 		for row in self.si_list:
@@ -755,7 +780,6 @@ class GrossProfitGenerator:
 			credit_note_for_item = 0
 			if invoice_base_net_total:
 				credit_note_for_item = (row.base_net_amount / invoice_base_net_total) * credit_note_total
-
 
 			# initialize list with a header row for each new parent
 			grouped.setdefault(row.parent, [invoice_row]).append(
@@ -774,14 +798,13 @@ class GrossProfitGenerator:
 					grouped.get(row.parent).append(bundle_item)
 
 		self.si_list.clear()
-
 		for items in grouped.values():
 			self.si_list.extend(items)
 
 	def get_invoice_row(self, row, filters):
 		# header row format
 
-		debit_account = frappe.get_cached_value("Account", {"account_name": "Rebate Given"}, "name")
+		rebate_account = frappe.get_cached_value("Account", {"account_name": "Rebate Given"}, "name")
 
 		credit_note_total = frappe.db.sql(
 			"""
@@ -801,11 +824,10 @@ class GrossProfitGenerator:
 				)
 				and `tabJournal Entry Account`.account = %s
 				and `tabJournal Entry Account`.docstatus = 1
-			""", (row.parent, debit_account)
+			""", (row.parent, rebate_account)
 		)
 
 		credit_note_total = credit_note_total[0][0] or 0 if credit_note_total else 0
-
 
 		total_incentive_amount = frappe.db.sql("""
     	SELECT SUM(incentives) 
