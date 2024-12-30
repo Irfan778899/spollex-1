@@ -40,7 +40,7 @@ def execute(filters=None):
 				"buying_rate",
 				"base_amount",
 				"credit_note_total",
-				"base_net_total",
+				"selling_total",
 				"buying_amount",
 				"commission_amount",
 				"incentive_amount",
@@ -58,7 +58,7 @@ def execute(filters=None):
 				"buying_rate",
 				"base_amount",
 				"credit_note_total",
-				"base_net_total",
+				"selling_total",
 				"buying_amount",
 				"commission_amount",
 				"incentive_amount",
@@ -201,7 +201,7 @@ def get_columns(group_wise_columns, filters):
 				"options": "currency",
 				"width": 100,
 			},
-			"base_net_total": {
+			"selling_total": {
 				"label": _("Selling Total"),
 				"fieldname": "selling_total",
 				"fieldtype": "Currency",
@@ -314,7 +314,7 @@ def get_column_names():
 			"buying_rate": "valuation_rate",
 			"base_amount": "selling_amount",
 			"credit_note_total": "credit_note_total",
-			"base_net_total": "selling_total",
+			"selling_total": "selling_total",
 			"buying_amount": "buying_amount",
 			"commission_amount": "commission_amount",
 			"incentive_amount": "incentive_amount",
@@ -406,14 +406,14 @@ class GrossProfitGenerator:
 					row.buying_rate, row.base_rate = 0.0, 0.0
 
 			# calculate gross profit
-			row.base_net_total = flt(row.base_net_total, self.float_precision)
 			row.credit_note_total = flt(row.credit_note_total, self.float_precision)
 			row.commission_amount = flt(row.commission_amount, self.float_precision)
 			row.incentive_amount = flt(row.incentive_amount, self.float_precision)
-			row.gross_profit = flt(row.base_net_total - row.buying_amount - row.commission_amount - row.incentive_amount, self.currency_precision)
-			if row.base_net_total:
+			row.selling_total = flt(row.base_amount - row.credit_note_total, self.float_precision)
+			row.gross_profit = flt(row.selling_total - row.buying_amount - row.commission_amount - row.incentive_amount, self.currency_precision)
+			if row.base_amount:
 				row.gross_profit_percent = flt(
-					(row.gross_profit / row.base_net_total) * 100.0, self.currency_precision
+					(row.gross_profit / row.selling_total) * 100.0, self.currency_precision
 				)
 			else:
 				row.gross_profit_percent = 0.0
@@ -457,10 +457,10 @@ class GrossProfitGenerator:
 						new_row = row
 					else:
 						new_row.qty += flt(row.qty)
+						new_row.selling_total += flt(row.selling_total, self.currency_precision)
 						new_row.buying_amount += flt(row.buying_amount, self.currency_precision)
 						new_row.base_amount += flt(row.base_amount, self.currency_precision)
 						new_row.credit_note_total += flt(row.credit_note_total, self.currency_precision)
-						new_row.base_net_total = flt(new_row.base_amount - new_row.credit_note_total, self.currency_precision)
 						new_row.commission_amount += flt(row.commission_amount, self.currency_precision)
 						new_row.incentive_amount += flt(row.incentive_amount, self.currency_precision)
 				new_row = self.set_average_rate(new_row)
@@ -481,10 +481,10 @@ class GrossProfitGenerator:
 		return new_row
 
 	def set_average_gross_profit(self, new_row):
-		new_row.gross_profit = flt(new_row.base_net_total - new_row.buying_amount - new_row.commission_amount - new_row.incentive_amount, self.currency_precision)
+		new_row.gross_profit = flt(new_row.selling_total - new_row.buying_amount - new_row.commission_amount - new_row.incentive_amount, self.currency_precision)
 		new_row.gross_profit_percent = (
-			flt(((new_row.gross_profit / new_row.base_net_total) * 100.0), self.currency_precision)
-			if new_row.base_net_total
+			flt(((new_row.gross_profit / new_row.selling_total) * 100.0), self.currency_precision)
+			if new_row.selling_total
 			else 0
 		)
 
@@ -700,7 +700,6 @@ class GrossProfitGenerator:
 				`tabSales Invoice Item`.base_net_rate, `tabSales Invoice Item`.base_net_amount,
 				`tabSales Invoice Item`.name as "item_row", `tabSales Invoice`.is_return,
 				`tabSales Invoice Item`.cost_center, `tabSales Invoice Item`.serial_and_batch_bundle,
-				`tabSales Invoice`.base_net_total,
 				`tabSales Invoice`.total_commission,
 				(`tabSales Invoice`.total_commission / `tabSales Invoice`.base_net_total) * `tabSales Invoice Item`.base_net_amount as commission_amount,
 				(ifnull(sum(`tabSales Team`.incentives), 0) / `tabSales Invoice`.base_net_total) * `tabSales Invoice Item`.base_net_amount as incentive_amount,
@@ -785,7 +784,7 @@ class GrossProfitGenerator:
 			grouped.setdefault(row.parent, [invoice_row]).append(
 				row.update(
 					{"indent": 1.0, "parent_invoice": row.parent, "invoice_or_item": row.item_code, 
-					"credit_note_total": credit_note_for_item, "base_net_total": row.base_net_amount - credit_note_for_item
+					"credit_note_total": credit_note_for_item, "selling_total": row.base_net_amount - credit_note_for_item
 					}
 				)  # descendant rows will have indent: 1.0 or greater
 			)
@@ -861,7 +860,7 @@ class GrossProfitGenerator:
 				"cost_center": row.cost_center,
 				"base_net_amount": frappe.db.get_value("Sales Invoice", row.parent, "base_net_total"),
 				"credit_note_total": credit_note_total,
-				"base_net_total": frappe.db.get_value("Sales Invoice", row.parent, "base_net_total") - credit_note_total,
+				"selling_total": frappe.db.get_value("Sales Invoice", row.parent, "base_net_total") - credit_note_total,
 				"commission_amount": frappe.db.get_value("Sales Invoice", row.parent, "total_commission"),
 				"incentive_amount": total_incentive_amount
 			}
