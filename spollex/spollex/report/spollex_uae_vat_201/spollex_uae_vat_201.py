@@ -388,7 +388,9 @@ def get_zero_rated_total(filters):
 			on
 				i.parent = s.name
 			where
-				s.docstatus = 1 and  i.is_zero_rated = 1
+				s.docstatus = 1 and
+				s.is_opening = "No" and
+				i.is_zero_rated = 1
 				{conditions} ;
 			""",
 				filters,
@@ -413,7 +415,9 @@ def get_exempt_total(filters):
 			on
 				i.parent = s.name
 			where
-				s.docstatus = 1 and  (i.is_exempt = 1 or i.tax_amount = 0 ) and  i.is_zero_rated != 1
+				s.docstatus = 1 and
+				s.is_opening = "No" and
+				(i.is_exempt = 1 or i.tax_amount = 0 ) and  i.is_zero_rated != 1
 				{conditions} ;
 			""",
 				filters,
