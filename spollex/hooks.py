@@ -162,7 +162,13 @@ doc_events = {
     "Purchase Invoice": {
         "on_submit": "spollex.doctype_events.purchase_invoice.create_journal_entry_on_submit",
         "on_cancel": "spollex.doctype_events.purchase_invoice.cancel_journal_entry_on_cancel"
-    }
+    },
+    "Purchase Order": {
+		"validate": [
+			"erpnext.regional.united_arab_emirates.utils.update_grand_total_for_rcm",
+			"erpnext.regional.united_arab_emirates.utils.validate_returns",
+		]
+	}
 }
 
 # Scheduled Tasks
