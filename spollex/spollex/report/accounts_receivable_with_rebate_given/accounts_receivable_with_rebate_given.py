@@ -367,8 +367,12 @@ class ReceivablePayableReport:
 			invoice_details.pop("due_date", None)
 		row.update(invoice_details)
 
-		if "rebate_given" in invoice_details:
+		if "rebate_received" in invoice_details:
+			row["rebate_received"] = invoice_details["rebate_received"]
+			row["paid"] = row["paid"] - row["rebate_received"]
+		elif "rebate_given" in invoice_details:
 			row["rebate_given"] = invoice_details["rebate_given"]
+			row["paid"] = row["paid"] - row["rebate_given"]
 
 		if row.voucher_type == "Sales Invoice":
 			if self.filters.show_delivery_notes:

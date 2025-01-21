@@ -102,6 +102,7 @@ def create_debit_note(rebate_amount, posting_date, reference_name):
     rebate_amount = float(rebate_amount)
     currency = purchase_invoice.get("currency")
     conversion_rate = purchase_invoice.get("conversion_rate")
+    reverse_charge = purchase_invoice.get("reverse_charge")
 
     if currency != frappe.get_cached_value("Company", company, "default_currency") and conversion_rate:
         rebate_amount = rebate_amount * conversion_rate
@@ -122,29 +123,31 @@ def create_debit_note(rebate_amount, posting_date, reference_name):
     vat_entries = []
 
     tax_rows = purchase_invoice.get("taxes")
-    for row in tax_rows:
-        tax_rate = None
-        if row.rate:
-            tax_rate = float(row.rate)
-        elif row.account_head and row.charge_type == "On Net Total":
-            tax_rate = frappe.get_value("Account", row.account_head, "tax_rate")
-            if tax_rate is None:
-                frappe.throw(f"Failed to fetch tax rate for account: {row.account_head}")
 
-        if tax_rate:
-            tax_amount = rebate_amount * tax_rate / 100
-            total_tax_amount += tax_amount
+    if reverse_charge == "N":
+        for row in tax_rows:
+            tax_rate = None
+            if row.rate:
+                tax_rate = float(row.rate)
+            elif row.account_head and row.charge_type == "On Net Total":
+                tax_rate = frappe.get_value("Account", row.account_head, "tax_rate")
+                if tax_rate is None:
+                    frappe.throw(f"Failed to fetch tax rate for account: {row.account_head}")
 
-            if row.account_head and tax_amount > 0:
-                vat_entries.append(
-                    {
-                        "account": row.account_head,
-                        "party_type": "",
-                        "party": "",
-                        "debit_in_account_currency": 0,
-                        "credit_in_account_currency": tax_amount,
-                    }
-                )
+            if tax_rate:
+                tax_amount = rebate_amount * tax_rate / 100
+                total_tax_amount += tax_amount
+
+                if row.account_head and tax_amount > 0:
+                    vat_entries.append(
+                        {
+                            "account": row.account_head,
+                            "party_type": "",
+                            "party": "",
+                            "debit_in_account_currency": 0,
+                            "credit_in_account_currency": tax_amount,
+                        }
+                    )
 
 
     debit_amount = rebate_amount + total_tax_amount
