@@ -440,12 +440,12 @@ class ReceivablePayableReport:
 			)
 
 			for d in si_list:
-				rebate_account = frappe.get_cached_value("Account", {"account_name": "Rebate Given"}, "name")
+				default_receivable_account = frappe.db.get_value('Company', self.filters.company, 'default_receivable_account')
 
 				credit_note_total = frappe.db.sql(
 					"""
 					select
-						sum(`tabJournal Entry Account`.debit_in_account_currency)
+						sum(`tabJournal Entry Account`.credit_in_account_currency)
 					from
 						`tabJournal Entry Account`
 					where
@@ -460,7 +460,7 @@ class ReceivablePayableReport:
 						)
 						and `tabJournal Entry Account`.account = %s
 						and `tabJournal Entry Account`.docstatus = 1
-					""", (d.name, rebate_account)
+					""", (d.name, default_receivable_account)
 				)
 
 				credit_note_total = credit_note_total[0][0] or 0 if credit_note_total else 0
@@ -498,12 +498,13 @@ class ReceivablePayableReport:
 				(self.filters.report_date, self.filters.company),
 				as_dict=1,
 			):
-				debit_account = frappe.get_cached_value("Account", {"account_name": "Rebate Received"}, "name")
+
+				default_payable_account = frappe.db.get_value('Company', self.filters.company, 'default_payable_account')
 
 				debit_note_total = frappe.db.sql(
 					"""
 					select
-						sum(`tabJournal Entry Account`.credit_in_account_currency)
+						sum(`tabJournal Entry Account`.debit_in_account_currency)
 					from
 						`tabJournal Entry Account`
 					where
@@ -518,7 +519,7 @@ class ReceivablePayableReport:
 						)
 						and `tabJournal Entry Account`.account = %s
 						and `tabJournal Entry Account`.docstatus = 1
-					""", (pi.name, debit_account)
+					""", (pi.name, default_payable_account)
 				)
 
 				debit_note_total = debit_note_total[0][0] or 0 if debit_note_total else 0
