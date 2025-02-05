@@ -143,9 +143,9 @@ doctype_js = {
 # override_doctype_class = {
 # 	"ToDo": "custom_app.overrides.CustomToDo"
 # }
-override_doctype_class = {
-    "Sales Person": "spollex.overrides.sales_person.CustomSalesPerson"
-}
+#override_doctype_class = {
+#    "Sales Person": "spollex.overrides.sales_person.CustomSalesPerson"
+#}
 
 # Document Events
 # ---------------

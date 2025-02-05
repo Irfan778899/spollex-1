@@ -32,6 +32,7 @@ def execute(filters=None):
 				"item_code",
 				"item_name",
 				"item_group",
+				"vendor_partner_name",
 				"brand",
 				"description",
 				"warehouse",
@@ -43,7 +44,7 @@ def execute(filters=None):
 				"selling_total",
 				"buying_amount",
 				"commission_amount",
-				"incentive_amount",
+#				"incentive_amount",
 				"gross_profit",
 				"gross_profit_percent",
 				"project",
@@ -61,7 +62,7 @@ def execute(filters=None):
 				"selling_total",
 				"buying_amount",
 				"commission_amount",
-				"incentive_amount",
+#				"incentive_amount",
 				"gross_profit",
 				"gross_profit_percent",
 			],
@@ -158,6 +159,12 @@ def get_columns(group_wise_columns, filters):
 				"options": "Item Group",
 				"width": 100,
 			},
+			"vendor_partner_name": {
+				"label": _("Vendor Partner Name"),
+				"fieldname": "vendor_partner_name",
+				"fieldtype": "Data",
+				"width": 100,
+			},
 			"brand": {"label": _("Brand"), "fieldtype": "Link", "options": "Brand", "width": 100},
 			"description": {
 				"label": _("Description"),
@@ -222,13 +229,13 @@ def get_columns(group_wise_columns, filters):
 				"options": "currency",
 				"width": 100,
 			},
-			"incentive_amount": {
-				"label": _("Incentive Amount"),
-				"fieldname": "incentive_amount",
-				"fieldtype": "Currency",
-				"options": "currency",
-				"width": 100,
-			},
+#			"incentive_amount": {
+#				"label": _("Incentive Amount"),
+#				"fieldname": "incentive_amount",
+#				"fieldtype": "Currency",
+#				"options": "currency",
+#				"width": 100,
+#			},
 			"gross_profit": {
 				"label": _("Gross Profit"),
 				"fieldname": "gross_profit",
@@ -306,6 +313,7 @@ def get_column_names():
 			"item_code": "item_code",
 			"item_name": "item_name",
 			"item_group": "item_group",
+			"vendor_partner_name": "vendor_partner_name",
 			"brand": "brand",
 			"description": "description",
 			"warehouse": "warehouse",
@@ -317,7 +325,7 @@ def get_column_names():
 			"selling_total": "selling_total",
 			"buying_amount": "buying_amount",
 			"commission_amount": "commission_amount",
-			"incentive_amount": "incentive_amount",
+#			"incentive_amount": "incentive_amount",
 			"gross_profit": "gross_profit",
 			"gross_profit_percent": "gross_profit_%",
 			"project": "project",
@@ -408,9 +416,9 @@ class GrossProfitGenerator:
 			# calculate gross profit
 			row.credit_note_total = flt(row.credit_note_total, self.float_precision)
 			row.commission_amount = flt(row.commission_amount, self.float_precision)
-			row.incentive_amount = flt(row.incentive_amount, self.float_precision)
+#			row.incentive_amount = flt(row.incentive_amount, self.float_precision)
 			row.selling_total = flt(row.base_amount - row.credit_note_total, self.float_precision)
-			row.gross_profit = flt(row.selling_total - row.buying_amount - row.commission_amount - row.incentive_amount, self.currency_precision)
+			row.gross_profit = flt(row.selling_total - row.buying_amount - row.commission_amount, self.currency_precision)
 			if row.base_amount:
 				row.gross_profit_percent = flt(
 					(row.gross_profit / row.selling_total) * 100.0, self.currency_precision
@@ -462,7 +470,7 @@ class GrossProfitGenerator:
 						new_row.base_amount += flt(row.base_amount, self.currency_precision)
 						new_row.credit_note_total += flt(row.credit_note_total, self.currency_precision)
 						new_row.commission_amount += flt(row.commission_amount, self.currency_precision)
-						new_row.incentive_amount += flt(row.incentive_amount, self.currency_precision)
+#						new_row.incentive_amount += flt(row.incentive_amount, self.currency_precision)
 				new_row = self.set_average_rate(new_row)
 				self.grouped_data.append(new_row)
 
@@ -481,7 +489,7 @@ class GrossProfitGenerator:
 		return new_row
 
 	def set_average_gross_profit(self, new_row):
-		new_row.gross_profit = flt(new_row.selling_total - new_row.buying_amount - new_row.commission_amount - new_row.incentive_amount, self.currency_precision)
+		new_row.gross_profit = flt(new_row.selling_total - new_row.buying_amount - new_row.commission_amount, self.currency_precision)
 		new_row.gross_profit_percent = (
 			flt(((new_row.gross_profit / new_row.selling_total) * 100.0), self.currency_precision)
 			if new_row.selling_total
@@ -694,6 +702,7 @@ class GrossProfitGenerator:
 				`tabSales Invoice`.territory, `tabSales Invoice Item`.item_code,
 				`tabSales Invoice Item`.item_name, `tabSales Invoice Item`.description,
 				`tabSales Invoice Item`.warehouse, `tabSales Invoice Item`.item_group,
+				`tabVendor Partner Details`.vendor_partner_name,
 				`tabSales Invoice Item`.brand, `tabSales Invoice Item`.so_detail,
 				`tabSales Invoice Item`.sales_order, `tabSales Invoice Item`.dn_detail,
 				`tabSales Invoice Item`.delivery_note, `tabSales Invoice Item`.stock_qty as qty,
@@ -726,6 +735,8 @@ class GrossProfitGenerator:
 					on `tabSales Invoice Item`.parent = `tabSales Invoice`.name
 				join `tabItem` item on item.name = `tabSales Invoice Item`.item_code
 				left join `tabSales Team` on `tabSales Team`.parent = `tabSales Invoice`.name
+				left join `tabVendor Partner Details` on `tabVendor Partner Details`.item_group = `tabSales Invoice Item`.item_group
+				AND `tabVendor Partner Details`.parent = `tabSales Invoice`.customer
 			where
 				`tabSales Invoice`.docstatus=1 and `tabSales Invoice`.is_opening!='Yes' {conditions} {match_cond}
 			group by
@@ -851,6 +862,7 @@ class GrossProfitGenerator:
 				"description": None,
 				"warehouse": None,
 				"item_group": None,
+				"vendor_partner_name": None,
 				"brand": None,
 				"dn_detail": None,
 				"delivery_note": None,
