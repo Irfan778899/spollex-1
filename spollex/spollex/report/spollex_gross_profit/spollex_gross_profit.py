@@ -32,8 +32,8 @@ def execute(filters=None):
 				"item_code",
 				"item_name",
 				"item_group",
-				"vendor_partner_name",
-				"brand",
+				"sales_partner_name",
+#				"brand",
 				"description",
 				"warehouse",
 				"qty",
@@ -47,7 +47,7 @@ def execute(filters=None):
 #				"incentive_amount",
 				"gross_profit",
 				"gross_profit_percent",
-				"project",
+#				"project",
 			],
 			"item_code": [
 				"item_code",
@@ -87,6 +87,17 @@ def get_data_when_grouped_by_invoice(columns, gross_profit_data, filters, group_
 	# removing Item Code and Item Name columns
 	del columns[4:6]
 
+	total_qty = 0.0
+#	total_avg_selling_rate = 0.0
+#	total_valuation_rate = 0.0
+	total_selling_amount = 0.0
+	total_credit_note = 0.0
+	total_selling_total = 0.0
+	total_buying_amount = 0.0
+	total_commission_amount = 0.0
+	total_gross_profit = 0.0
+	total_gross_profit_percent = 0.0
+
 	for src in gross_profit_data.si_list:
 		row = frappe._dict()
 		row.indent = src.indent
@@ -95,9 +106,36 @@ def get_data_when_grouped_by_invoice(columns, gross_profit_data, filters, group_
 
 		for col in group_wise_columns.get(scrub(filters.group_by)):
 			row[column_names[col]] = src.get(col)
+		print()
+		if src.indent != 1:
+			total_qty += flt(src.qty)
+#			total_avg_selling_rate += flt(src.base_rate)
+#			total_valuation_rate += flt(src.buying_rate)
+			total_selling_amount += flt(src.base_amount)
+			total_credit_note += flt(src.credit_note_total)
+			total_selling_total += flt(src.selling_total)
+			total_buying_amount += flt(src.buying_amount)
+			total_commission_amount += flt(src.commission_amount)
+			total_gross_profit += flt(src.gross_profit)
 
 		data.append(row)
+	if total_selling_total:
+		total_gross_profit_percent = (total_gross_profit / total_selling_total) * 100
 
+	total_row = frappe._dict()
+	total_row["sales_invoice"] = "Total"
+	total_row["qty"] = total_qty
+#	total_row["avg._selling_rate"] = total_avg_selling_rate
+#	total_row["valuation_rate"] = total_valuation_rate
+	total_row["selling_amount"] = total_selling_amount
+	total_row["credit_note_total"] = total_credit_note
+	total_row["selling_total"] = total_selling_total
+	total_row["buying_amount"] = total_buying_amount
+	total_row["commission_amount"] = total_commission_amount
+	total_row["gross_profit"] = total_gross_profit
+	total_row["gross_profit_%"] = total_gross_profit_percent
+
+	data.append(total_row)
 
 def get_data_when_not_grouped_by_invoice(gross_profit_data, filters, group_wise_columns, data):
 	for src in gross_profit_data.grouped_data:
@@ -159,9 +197,9 @@ def get_columns(group_wise_columns, filters):
 				"options": "Item Group",
 				"width": 100,
 			},
-			"vendor_partner_name": {
-				"label": _("Vendor Partner Name"),
-				"fieldname": "vendor_partner_name",
+			"sales_partner_name": {
+				"label": _("Sales Partner"),
+				"fieldname": "sales_partner_name",
 				"fieldtype": "Data",
 				"width": 100,
 			},
@@ -181,49 +219,49 @@ def get_columns(group_wise_columns, filters):
 			},
 			"qty": {"label": _("Qty"), "fieldname": "qty", "fieldtype": "Float", "width": 80},
 			"base_rate": {
-				"label": _("Avg. Selling Rate"),
+				"label": _("Sell Rate"),
 				"fieldname": "avg._selling_rate",
 				"fieldtype": "Currency",
 				"options": "currency",
 				"width": 100,
 			},
 			"buying_rate": {
-				"label": _("Valuation Rate"),
+				"label": _("Valn Rate"),
 				"fieldname": "valuation_rate",
 				"fieldtype": "Currency",
 				"options": "currency",
 				"width": 100,
 			},
 			"base_amount": {
-				"label": _("Selling Amount"),
+				"label": _("Sell Amt"),
 				"fieldname": "selling_amount",
 				"fieldtype": "Currency",
 				"options": "currency",
 				"width": 100,
 			},
 			"credit_note_total": {
-				"label": _("Credit Note"),
+				"label": _("Cr Note"),
 				"fieldname": "credit_note_total",
 				"fieldtype": "Currency",
 				"options": "currency",
 				"width": 100,
 			},
 			"selling_total": {
-				"label": _("Selling Total"),
+				"label": _("Sell Total"),
 				"fieldname": "selling_total",
 				"fieldtype": "Currency",
 				"options": "currency",
 				"width": 100,
 			},
 			"buying_amount": {
-				"label": _("Buying Amount"),
+				"label": _("Buy Amt"),
 				"fieldname": "buying_amount",
 				"fieldtype": "Currency",
 				"options": "currency",
 				"width": 100,
 			},
 			"commission_amount": {
-				"label": _("Commission Amount"),
+				"label": _("Comm Amt"),
 				"fieldname": "commission_amount",
 				"fieldtype": "Currency",
 				"options": "currency",
@@ -237,14 +275,14 @@ def get_columns(group_wise_columns, filters):
 #				"width": 100,
 #			},
 			"gross_profit": {
-				"label": _("Gross Profit"),
+				"label": _("GP"),
 				"fieldname": "gross_profit",
 				"fieldtype": "Currency",
 				"options": "currency",
 				"width": 100,
 			},
 			"gross_profit_percent": {
-				"label": _("Gross Profit Percent"),
+				"label": _("GP %"),
 				"fieldname": "gross_profit_%",
 				"fieldtype": "Percent",
 				"width": 100,
@@ -313,7 +351,7 @@ def get_column_names():
 			"item_code": "item_code",
 			"item_name": "item_name",
 			"item_group": "item_group",
-			"vendor_partner_name": "vendor_partner_name",
+			"sales_partner_name": "sales_partner_name",
 			"brand": "brand",
 			"description": "description",
 			"warehouse": "warehouse",
@@ -702,15 +740,26 @@ class GrossProfitGenerator:
 				`tabSales Invoice`.territory, `tabSales Invoice Item`.item_code,
 				`tabSales Invoice Item`.item_name, `tabSales Invoice Item`.description,
 				`tabSales Invoice Item`.warehouse, `tabSales Invoice Item`.item_group,
-				`tabVendor Partner Details`.vendor_partner_name,
+				`tabSales Partner Details`.sales_partner_name,
 				`tabSales Invoice Item`.brand, `tabSales Invoice Item`.so_detail,
 				`tabSales Invoice Item`.sales_order, `tabSales Invoice Item`.dn_detail,
 				`tabSales Invoice Item`.delivery_note, `tabSales Invoice Item`.stock_qty as qty,
 				`tabSales Invoice Item`.base_net_rate, `tabSales Invoice Item`.base_net_amount,
 				`tabSales Invoice Item`.name as "item_row", `tabSales Invoice`.is_return,
 				`tabSales Invoice Item`.cost_center, `tabSales Invoice Item`.serial_and_batch_bundle,
-				`tabSales Invoice`.total_commission,
-				(`tabSales Invoice`.total_commission / `tabSales Invoice`.base_net_total) * `tabSales Invoice Item`.base_net_amount as commission_amount,
+				(
+					SELECT `tabSales Partner Details`.commission_amount
+					FROM `tabSales Partner Details`
+					WHERE `tabSales Partner Details`.parent = `tabSales Invoice Item`.parent
+					AND `tabSales Partner Details`.item_group = `tabSales Invoice Item`.item_group
+					LIMIT 1
+					) * `tabSales Invoice Item`.base_net_amount / (
+					SELECT SUM(`tabSales Invoice Item`.base_net_amount)
+					FROM `tabSales Invoice Item`
+					WHERE `tabSales Invoice Item`.parent = `tabSales Invoice Item`.parent
+					AND `tabSales Invoice Item`.item_group = `tabSales Invoice Item`.item_group
+					AND `tabSales Invoice Item`.docstatus = 1
+					) AS commission_amount,
 				(ifnull(sum(`tabSales Team`.incentives), 0) / `tabSales Invoice`.base_net_total) * `tabSales Invoice Item`.base_net_amount as incentive_amount,
 				(
 					select
@@ -735,8 +784,8 @@ class GrossProfitGenerator:
 					on `tabSales Invoice Item`.parent = `tabSales Invoice`.name
 				join `tabItem` item on item.name = `tabSales Invoice Item`.item_code
 				left join `tabSales Team` on `tabSales Team`.parent = `tabSales Invoice`.name
-				left join `tabVendor Partner Details` on `tabVendor Partner Details`.item_group = `tabSales Invoice Item`.item_group
-				AND `tabVendor Partner Details`.parent = `tabSales Invoice`.customer
+				left join `tabSales Partner Details` on `tabSales Partner Details`.parent = `tabSales Invoice`.name
+				and `tabSales Partner Details`.item_group = `tabSales Invoice Item`.item_group
 			where
 				`tabSales Invoice`.docstatus=1 and `tabSales Invoice`.is_opening!='Yes' {conditions} {match_cond}
 			group by
@@ -839,11 +888,18 @@ class GrossProfitGenerator:
 
 		credit_note_total = credit_note_total[0][0] or 0 if credit_note_total else 0
 
-		total_incentive_amount = frappe.db.sql("""
-    	SELECT SUM(incentives) 
-    		FROM `tabSales Team` 
+#		total_incentive_amount = frappe.db.sql("""
+#    	SELECT SUM(incentives)
+#    		FROM `tabSales Team`
+#    		WHERE parent = %s
+#		""", (row.parent,), as_dict=False)[0][0]
+
+		total_commission_amount = frappe.db.sql("""
+			SELECT SUM(commission_amount)
+			FROM `tabSales Partner Details`
     		WHERE parent = %s
-		""", (row.parent,), as_dict=False)[0][0]
+		""", (row.parent,))[0][0] or 0
+
 
 		return frappe._dict(
 			{
@@ -862,7 +918,7 @@ class GrossProfitGenerator:
 				"description": None,
 				"warehouse": None,
 				"item_group": None,
-				"vendor_partner_name": None,
+				"sales_partner_name": None,
 				"brand": None,
 				"dn_detail": None,
 				"delivery_note": None,
@@ -873,8 +929,8 @@ class GrossProfitGenerator:
 				"base_net_amount": frappe.db.get_value("Sales Invoice", row.parent, "base_net_total"),
 				"credit_note_total": credit_note_total,
 				"selling_total": frappe.db.get_value("Sales Invoice", row.parent, "base_net_total") - credit_note_total,
-				"commission_amount": frappe.db.get_value("Sales Invoice", row.parent, "total_commission"),
-				"incentive_amount": total_incentive_amount
+				"commission_amount": total_commission_amount,
+#				"incentive_amount": total_incentive_amount
 			}
 		)
 
@@ -886,11 +942,17 @@ class GrossProfitGenerator:
 	def get_bundle_item_row(self, product_bundle, item):
 		item_name, description, item_group, brand = self.get_bundle_item_details(item.item_code)
 
-		total_incentive_amount = frappe.db.sql("""
-    	SELECT SUM(incentives) 
-    		FROM `tabSales Team` 
-    		WHERE parent = %s
-		""", (product_bundle.parent,), as_dict=False)[0][0]
+#		total_incentive_amount = frappe.db.sql("""
+#    	SELECT SUM(incentives)
+#    		FROM `tabSales Team`
+#    		WHERE parent = %s
+#		""", (product_bundle.parent,), as_dict=False)[0][0]
+
+			total_commission_amount = frappe.db.sql("""
+			SELECT SUM(commission_amount)
+			FROM `tabSales Partner Details`
+			WHERE parent = %s
+		""", (product_bundle.parent,))[0][0] or 0
 
 		return frappe._dict(
 			{
@@ -915,8 +977,8 @@ class GrossProfitGenerator:
 				"item_row": None,
 				"is_return": product_bundle.is_return,
 				"cost_center": product_bundle.cost_center,
-				"commission_amount": frappe.db.get_value("Sales Invoice", product_bundle.parent, "total_commission"),
-				"incentive_amount": total_incentive_amount,
+				"commission_amount": total_commission_amount,
+#				"incentive_amount": total_incentive_amount,
 			}
 		)
 
