@@ -948,8 +948,8 @@ class GrossProfitGenerator:
 #    		WHERE parent = %s
 #		""", (product_bundle.parent,), as_dict=False)[0][0]
 
-			total_commission_amount = frappe.db.sql("""
-			SELECT SUM(commission_amount)
+		total_commission_amount = frappe.db.sql("""
+		SELECT SUM(commission_amount)
 			FROM `tabSales Partner Details`
 			WHERE parent = %s
 		""", (product_bundle.parent,))[0][0] or 0
