@@ -106,7 +106,7 @@ def get_data_when_grouped_by_invoice(columns, gross_profit_data, filters, group_
 
 		for col in group_wise_columns.get(scrub(filters.group_by)):
 			row[column_names[col]] = src.get(col)
-		print()
+
 		if src.indent != 1:
 			total_qty += flt(src.qty)
 #			total_avg_selling_rate += flt(src.base_rate)
@@ -124,9 +124,9 @@ def get_data_when_grouped_by_invoice(columns, gross_profit_data, filters, group_
 
 	total_row = frappe._dict()
 	total_row["sales_invoice"] = "Total"
-	total_row["qty"] = total_qty
-#	total_row["avg._selling_rate"] = total_avg_selling_rate
-#	total_row["valuation_rate"] = total_valuation_rate
+	total_row["qty"] = None
+	total_row["avg._selling_rate"] = None
+	total_row["valuation_rate"] = None
 	total_row["selling_amount"] = total_selling_amount
 	total_row["credit_note_total"] = total_credit_note
 	total_row["selling_total"] = total_selling_total
