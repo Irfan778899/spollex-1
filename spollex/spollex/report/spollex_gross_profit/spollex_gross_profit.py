@@ -756,8 +756,8 @@ class GrossProfitGenerator:
 					) * `tabSales Invoice Item`.base_net_amount / (
 					SELECT SUM(`tabSales Invoice Item`.base_net_amount)
 					FROM `tabSales Invoice Item`
-					WHERE `tabSales Invoice Item`.parent = `tabSales Invoice Item`.parent
-					AND `tabSales Invoice Item`.item_group = `tabSales Invoice Item`.item_group
+					WHERE `tabSales Invoice Item`.parent = `tabSales Invoice`.name
+					AND `tabSales Invoice Item`.item_group = `tabSales Partner Details`.item_group
 					AND `tabSales Invoice Item`.docstatus = 1
 					) AS commission_amount,
 				(ifnull(sum(`tabSales Team`.incentives), 0) / `tabSales Invoice`.base_net_total) * `tabSales Invoice Item`.base_net_amount as incentive_amount,
