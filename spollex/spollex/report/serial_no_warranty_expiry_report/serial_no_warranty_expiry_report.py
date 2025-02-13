@@ -8,7 +8,9 @@ from frappe import _
 from frappe.utils import formatdate
 
 from erpnext.stock.doctype.serial_no.serial_no import get_serial_nos as get_serial_nos_from_sle
-from erpnext.stock.stock_ledger import get_stock_ledger_entries
+from erpnext.stock.utils import (
+	get_combine_datetime
+)
 
 BUYING_VOUCHER_TYPES = ["Purchase Invoice", "Purchase Receipt", "Subcontracting Receipt"]
 SELLING_VOUCHER_TYPES = ["Sales Invoice", "Delivery Note"]
@@ -101,6 +103,7 @@ def get_columns(filters):
 
 
 def get_data(filters):
+
 	stock_ledgers = get_stock_ledger_entries(filters, "<=", order="asc", check_serial_no=False)
 
 	if not stock_ledgers:
@@ -198,3 +201,76 @@ def get_serial_nos(filters, serial_bundle_ids):
 		)
 
 	return bundle_wise_serial_nos
+
+def get_stock_ledger_entries(
+	previous_sle,
+	operator=None,
+	order="desc",
+	limit=None,
+	for_update=False,
+	debug=False,
+	check_serial_no=True,
+	extra_cond=None,
+):
+	"""get stock ledger entries filtered by specific posting datetime conditions"""
+	conditions = f" and posting_datetime {operator} %(posting_datetime)s"
+	if previous_sle.get("warehouse"):
+		conditions += " and warehouse = %(warehouse)s"
+	elif previous_sle.get("warehouse_condition"):
+		conditions += " and " + previous_sle.get("warehouse_condition")
+
+	if check_serial_no and previous_sle.get("serial_no"):
+		# conditions += " and serial_no like {}".format(frappe.db.escape('%{0}%'.format(previous_sle.get("serial_no"))))
+		serial_no = previous_sle.get("serial_no")
+		conditions += (
+			""" and
+			(
+				serial_no = {}
+				or serial_no like {}
+				or serial_no like {}
+				or serial_no like {}
+			)
+		"""
+		).format(
+			frappe.db.escape(serial_no),
+			frappe.db.escape(f"{serial_no}\n%"),
+			frappe.db.escape(f"%\n{serial_no}"),
+			frappe.db.escape(f"%\n{serial_no}\n%"),
+		)
+
+	if not previous_sle.get("posting_date"):
+		previous_sle["posting_datetime"] = "1900-01-01 00:00:00"
+	else:
+		posting_time = previous_sle.get("posting_time")
+		if not posting_time:
+			posting_time = "00:00:00"
+
+		previous_sle["posting_datetime"] = get_combine_datetime(previous_sle["posting_date"], posting_time)
+
+	if operator in (">", "<=") and previous_sle.get("name"):
+		conditions += " and name!=%(name)s"
+
+	if extra_cond:
+		conditions += f"{extra_cond}"
+
+	if previous_sle.get("item_code"):
+		conditions += " and item_code = %(item_code)s"
+
+	# nosemgrep
+	return frappe.db.sql(
+		"""
+		select *, posting_datetime as "timestamp"
+		from `tabStock Ledger Entry`
+		where is_cancelled = 0
+		{conditions}
+		order by posting_datetime {order}, creation {order}
+		{limit} {for_update}""".format(
+			conditions=conditions,
+			limit=limit or "",
+			for_update=for_update and "for update" or "",
+			order=order,
+		),
+		previous_sle,
+		as_dict=1,
+		debug=debug,
+	)

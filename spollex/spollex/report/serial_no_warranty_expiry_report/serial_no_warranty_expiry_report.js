@@ -7,7 +7,6 @@ frappe.query_reports["Serial No Warranty Expiry Report"] = {
 			label: __("Item Code"),
 			fieldtype: "Link",
 			fieldname: "item_code",
-			reqd: 1,
 			options: "Item",
 			get_query: function () {
 				return {
@@ -43,7 +42,11 @@ frappe.query_reports["Serial No Warranty Expiry Report"] = {
 				let item_code = frappe.query_report.get_filter_value("item_code");
 				let warehouse = frappe.query_report.get_filter_value("warehouse");
 
-				let query_filters = { item_code: item_code };
+				let query_filters = {};
+				if (item_code) {
+					query_filters["item_code"] = item_code;
+				}
+
 				if (warehouse) {
 					query_filters["warehouse"] = warehouse;
 				}
