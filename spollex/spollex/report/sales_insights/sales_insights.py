@@ -96,6 +96,14 @@ class Analytics:
 					"width": 100,
 				}
 			)
+			self.columns.append(
+				{
+					"label": _("Stock In Hand"),
+					"fieldname": "stock_in_hand",
+					"fieldtype": "Data",
+					"width": 120,
+				}
+			)
 
 		for end_date in self.periodic_daterange:
 			period = self.get_period(end_date)
@@ -213,6 +221,27 @@ class Analytics:
 			)
 		).run(as_dict=True)
 
+		item_codes = [entry["entity"] for entry in self.entries]
+
+		default_warehouse = frappe.db.get_single_value("Stock Settings", "default_warehouse")
+
+		# Fetch stock in hand for the items
+		stock_in_hand_data = frappe.get_all(
+			"Bin",
+			fields=["item_code", "actual_qty"],
+			filters={
+				"item_code": ["in", item_codes],
+				"warehouse": default_warehouse
+			},
+		)
+
+		# Map stock in hand to each item
+		stock_in_hand_map = {d["item_code"]: d["actual_qty"] for d in stock_in_hand_data}
+
+		# Add stock in hand to each entry
+		for entry in self.entries:
+			entry["stock_in_hand"] = stock_in_hand_map.get(entry["entity"], 0.0)
+
 		self.entity_names = {}
 		for d in self.entries:
 			self.entity_names.setdefault(d.entity, d.entity_name)
@@ -308,6 +337,7 @@ class Analytics:
 
 			if self.filters.tree_type == "Item":
 				row["stock_uom"] = period_data.get("stock_uom")
+				row["stock_in_hand"] = period_data.get("stock_in_hand")
 
 			self.data.append(row)
 
@@ -344,6 +374,7 @@ class Analytics:
 
 			if self.filters.tree_type == "Item":
 				self.entity_periodic_data[d.entity]["stock_uom"] = d.stock_uom
+				self.entity_periodic_data[d.entity]["stock_in_hand"] = d.stock_in_hand
 
 	def get_period(self, posting_date):
 		if self.filters.range == "Weekly":
