@@ -231,11 +231,22 @@ def send_warranty_expiry_notification():
                     "item_code": frappe.db.get_value("Serial No", nos.name, "item_code"),
                     "item_description": frappe.db.get_value("Serial No", nos.name, "description"),
                     "end_customer": end_customer,
-                    "end_customer_email": end_customer_email
+                    "end_customer_email": end_customer_email,
+                    "company": si_doc.company,
+                    "company_email": company_email
                 }
 
-                send_email_notification("Warranty Expiry Notification", [customer_email, end_customer_email, company_email], doc_args, "Serial No", nos.name)
+                email_targets = [
+                    ("Warranty Expiry Notification to Partner", customer_email),
+                    ("Warranty Expiry Notification to End User", end_customer_email),
+                    ("Warranty Expiry Notification to Distributor", company_email)
+                ]
 
+                for template_name, recipient_email in email_targets:
+                    if recipient_email:
+                        send_email_notification(template_name, [recipient_email], doc_args, "Serial No", nos.name)
+
+    frappe.db.commit()
     frappe.msgprint("Warranty expiry notifications sent successfully.")
 
 @frappe.whitelist()
@@ -255,38 +266,47 @@ def send_subscription_expiry_notification():
             customer_email = frappe.db.get_value('Address', {"name": invoice.customer_address}, 'email_id')
         
         end_customer = invoice.custom_end_customer
-        end_customer_email = invoice.custom_end_customers_email
+        end_customer_email = invoice.custom_end_customer_email
 
         company_address_id = invoice.company_address
         company_email = frappe.db.get_value('Address', {"name": company_address_id}, 'email_id')
 
+        item_codes = frappe.get_all("Sales Invoice Item", filters={"parent": invoice.name}, pluck="item_code")
+        item_codes_str = "/ ".join(item_codes)
+
         doc_args = {
             "sales_invoice": invoice.name,
-            "customer_name": invoice.customer_name,
+            "customer_name": invoice.customer,
             "expiry_date": invoice.to_date,
+            "item_code": item_codes_str,
             "end_customer": end_customer,
-            "end_customer_email": end_customer_email
+            "end_customer_email": end_customer_email,
+            "company": invoice.company,
+            "company_email": company_email
         }
 
-        send_email_notification("Subscription Expiry Notification", [customer_email, end_customer_email, company_email], doc_args, "Sales Invoice", invoice.name)
+        email_targets = [
+            ("Warranty Expiry Notification to Partner", customer_email),
+            ("Warranty Expiry Notification to End User", end_customer_email),
+            ("Warranty Expiry Notification to Distributor", company_email)
+        ]
 
+        for template_name, recipient_email in email_targets:
+            if recipient_email:
+                send_email_notification(template_name, [recipient_email], doc_args, "Sales Invoice", invoice.name)
+
+    frappe.db.commit()
     frappe.msgprint("Subscription expiry notifications sent successfully.")
 
 def send_email_notification(template_name, recipients, doc_args, doctype, docname):
-    recipients = [email for email in recipients if email]
-    if not recipients:
-        return
-
     email_template = frappe.get_doc("Email Template", template_name)
     subject = frappe.render_template(email_template.subject, doc_args)
-    content = frappe.render_template(email_template.response_, doc_args)
+    message = frappe.render_template(email_template.response_, doc_args)
 
     frappe.sendmail(
         recipients=recipients,
         subject=subject,
-        message=content,
+        message=message,
         reference_doctype=doctype,
         reference_name=docname,
     )
-
-    frappe.msgprint(_("Email Sent to Recipients: {0}").format(", ".join(recipients)))
