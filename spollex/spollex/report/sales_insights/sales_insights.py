@@ -89,6 +89,15 @@ class Analytics:
 		if self.filters.tree_type == "Item":
 			self.columns.append(
 				{
+					"label": _("Item Group"),
+					"fieldname": "item_group",
+					"fieldtype": "Link",
+					"options": "Item Group",
+					"width": 100,
+				}
+			)
+			self.columns.append(
+				{
 					"label": _("UOM"),
 					"fieldname": "stock_uom",
 					"fieldtype": "Link",
@@ -210,6 +219,7 @@ class Analytics:
 			.select(
 				doctype_item.item_code.as_("entity"),
 				doctype_item.item_name.as_("entity_name"),
+				doctype_item.item_group,
 				doctype_item.stock_uom,
 				doctype_item[value_field].as_("value_field"),
 				doctype[self.date_field],
@@ -336,6 +346,7 @@ class Analytics:
 			row["total"] = total
 
 			if self.filters.tree_type == "Item":
+				row["item_group"] = period_data.get("item_group")
 				row["stock_uom"] = period_data.get("stock_uom")
 				row["stock_in_hand"] = period_data.get("stock_in_hand")
 
@@ -373,6 +384,7 @@ class Analytics:
 			self.entity_periodic_data[d.entity][period] += flt(d.value_field)
 
 			if self.filters.tree_type == "Item":
+				self.entity_periodic_data[d.entity]["item_group"] = d.item_group
 				self.entity_periodic_data[d.entity]["stock_uom"] = d.stock_uom
 				self.entity_periodic_data[d.entity]["stock_in_hand"] = d.stock_in_hand
 
