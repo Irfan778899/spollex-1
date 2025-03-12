@@ -79,6 +79,7 @@ def append_vat_on_sales(data, filters):
 	append_data(data, "7", _("Adjustments to goods imported into UAE"), "-", "-")
 
 	global total_sales_amount, total_sales_vat_amount
+	total_sales_amount = total_sales_vat_amount = 0
 	for row in data:
 		total_sales_amount += flt(row.get("amount"))
 		total_sales_vat_amount += flt(row.get("vat_amount"))
@@ -150,6 +151,7 @@ def append_vat_on_expenses(data, filters):
 	)
 
 	global total_purchase_amount, total_purchase_vat_amount
+	total_purchase_amount = total_purchase_vat_amount = 0
 	total_purchase_amount = standard_rated_purchase_amount - total_debit_amount + total_taxable_amount + standard_rated_reverse_purchase_amount
 	total_purchase_vat_amount = standard_rated_purchase_tax_amount - total_debit_vat + total_vat + standard_rated_reverse_purchase_tax_amount
 	append_data(data, "11", _("Totals"), frappe.format(total_purchase_amount, "Currency"), frappe.format(total_purchase_vat_amount, "Currency"))
