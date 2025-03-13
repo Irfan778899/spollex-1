@@ -175,7 +175,8 @@ def get_total_emiratewise(filters):
 			on
 				i.parent = s.name
 			where
-				s.docstatus = 1 and  i.is_exempt != 1 and i.is_zero_rated != 1 and i.tax_amount != 0
+				s.docstatus = 1 and  s.is_opening = "No" and
+				i.is_exempt != 1 and i.is_zero_rated != 1 and i.tax_amount != 0
 				{conditions}
 			group by
 				s.vat_emirate;
