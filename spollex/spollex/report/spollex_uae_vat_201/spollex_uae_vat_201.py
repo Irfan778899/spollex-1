@@ -72,8 +72,8 @@ def append_vat_on_sales(data, filters):
 		data,
 		"6",
 		_("Goods imported into UAE"),
-		frappe.format(get_reverse_charge_total(filters), "Currency"),
-		frappe.format(get_reverse_charge_tax(filters), "Currency"),
+		frappe.format(get_reverse_charge_recoverable_total(filters), "Currency"),
+		frappe.format(get_reverse_charge_recoverable_tax(filters), "Currency"),
 	)
 
 	append_data(data, "7", _("Adjustments to goods imported into UAE"), "-", "-")
@@ -270,26 +270,43 @@ def get_reverse_charge_recoverable_tax(filters):
 	"""Returns the sum of the tax of each Purchase invoice made."""
 	conditions = get_conditions_join(filters)
 	return (
-		frappe.db.sql(
-			f"""
-		select
-			sum(debit * p.recoverable_reverse_charge / 100)
-		from
-			`tabPurchase Invoice` p  inner join `tabGL Entry` gl
-		on
-			gl.voucher_no = p.name
-		where
-			p.reverse_charge = "Y"
-			and p.docstatus = 1
-			and p.recoverable_reverse_charge > 0
-			and gl.docstatus = 1
-			and account in (select account from `tabUAE VAT Account` where  parent=%(company)s)
-			{conditions} ;
-		""",
-			filters,
-		)[0][0]
-		or 0
-	)
+        frappe.db.sql(
+            f"""
+            SELECT 
+                SUM((p.base_net_total * p.recoverable_reverse_charge / 100) * 0.05)
+            FROM 
+                `tabPurchase Invoice` p
+            WHERE 
+                p.reverse_charge = "Y"
+                AND p.docstatus = 1
+                AND p.recoverable_reverse_charge > 0
+                {conditions};
+            """,
+            filters,
+        )[0][0]
+        or 0
+    )
+	# return (
+	# 	frappe.db.sql(
+	# 		f"""
+	# 	select
+	# 		sum(debit * p.recoverable_reverse_charge / 100)
+	# 	from
+	# 		`tabPurchase Invoice` p  inner join `tabGL Entry` gl
+	# 	on
+	# 		gl.voucher_no = p.name
+	# 	where
+	# 		p.reverse_charge = "Y"
+	# 		and p.docstatus = 1
+	# 		and p.recoverable_reverse_charge > 0
+	# 		and gl.docstatus = 1
+	# 		and account in (select account from `tabUAE VAT Account` where  parent=%(company)s)
+	# 		{conditions} ;
+	# 	""",
+	# 		filters,
+	# 	)[0][0]
+	# 	or 0
+	# )
 
 
 def get_conditions_join(filters):
