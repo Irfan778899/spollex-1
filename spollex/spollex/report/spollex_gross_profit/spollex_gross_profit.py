@@ -24,6 +24,33 @@ def execute(filters=None):
 
 	group_wise_columns = frappe._dict(
 		{
+			"default": [
+				"invoice_or_item",
+				"invoice",
+				"customer",
+				"customer_group",
+				"posting_date",
+				"item_code",
+				"item_name",
+				"item_group",
+				"sales_partner_name",
+#				"brand",
+				"description",
+				"warehouse",
+				"qty",
+				"base_rate",
+				"buying_rate",
+				"base_amount",
+				"credit_note_total",
+				"selling_total",
+				"buying_amount",
+				"commission_amount",
+#				"incentive_amount",
+				"gross_profit",
+				"gross_profit_percent",
+				"gross_profit_percent_on_cost",
+#				"project",
+			],
 			"invoice": [
 				"invoice_or_item",
 				"customer",
@@ -47,12 +74,13 @@ def execute(filters=None):
 #				"incentive_amount",
 				"gross_profit",
 				"gross_profit_percent",
+				"gross_profit_percent_on_cost",
 #				"project",
 			],
 			"item_code": [
 				"item_code",
 				"item_name",
-				"brand",
+#				"brand",
 				"description",
 				"qty",
 				"base_rate",
@@ -65,13 +93,14 @@ def execute(filters=None):
 #				"incentive_amount",
 				"gross_profit",
 				"gross_profit_percent",
+				"gross_profit_percent_on_cost",
 			],
 		}
 	)
 
 	columns = get_columns(group_wise_columns, filters)
 
-	if filters.group_by == "Invoice":
+	if filters.group_by in ["Invoice", "Default"]:
 		get_data_when_grouped_by_invoice(columns, gross_profit_data, filters, group_wise_columns, data)
 
 	else:
@@ -84,6 +113,8 @@ def get_data_when_grouped_by_invoice(columns, gross_profit_data, filters, group_
 
 	# to display item as Item Code: Item Name
 	columns[0] = "Sales Invoice:Link/Item:300"
+	if filters.group_by == "Default":
+		columns[0] = "Item Code:Link/Item:200"
 	# removing Item Code and Item Name columns
 	del columns[4:6]
 
@@ -97,6 +128,7 @@ def get_data_when_grouped_by_invoice(columns, gross_profit_data, filters, group_
 	total_commission_amount = 0.0
 	total_gross_profit = 0.0
 	total_gross_profit_percent = 0.0
+	total_gross_profit_percent_on_cost = 0.0
 
 	for src in gross_profit_data.si_list:
 		row = frappe._dict()
@@ -117,10 +149,14 @@ def get_data_when_grouped_by_invoice(columns, gross_profit_data, filters, group_
 			total_buying_amount += flt(src.buying_amount)
 			total_commission_amount += flt(src.commission_amount)
 			total_gross_profit += flt(src.gross_profit)
-
-		data.append(row)
+		if filters.group_by == "Invoice":
+			data.append(row)
+		elif filters.group_by == "Default" and row.indent == 1:
+			data.append(row)
 	if total_selling_total:
 		total_gross_profit_percent = (total_gross_profit / total_selling_total) * 100
+	if total_buying_amount:
+		total_gross_profit_percent_on_cost = (total_gross_profit/total_buying_amount) * 100
 
 	total_row = frappe._dict()
 	total_row["sales_invoice"] = "Total"
@@ -134,10 +170,20 @@ def get_data_when_grouped_by_invoice(columns, gross_profit_data, filters, group_
 	total_row["commission_amount"] = total_commission_amount
 	total_row["gross_profit"] = total_gross_profit
 	total_row["gross_profit_%"] = total_gross_profit_percent
+	total_row["gross_profit_%_on_cost"] = total_gross_profit_percent_on_cost
 
 	data.append(total_row)
 
 def get_data_when_not_grouped_by_invoice(gross_profit_data, filters, group_wise_columns, data):
+	total_qty = 0.0
+	total_selling_amount = 0.0
+	total_credit_note = 0.0
+	total_selling_total = 0.0
+	total_buying_amount = 0.0
+	total_commission_amount = 0.0
+	total_gross_profit = 0.0
+	total_gross_profit_percent = 0.0
+	total_gross_profit_percent_on_cost = 0.0
 	for src in gross_profit_data.grouped_data:
 		row = []
 		for col in group_wise_columns.get(scrub(filters.group_by)):
@@ -145,7 +191,27 @@ def get_data_when_not_grouped_by_invoice(gross_profit_data, filters, group_wise_
 
 		row.append(filters.currency)
 
+		total_qty += flt(src.qty)
+		total_selling_amount += flt(src.base_amount)
+		total_credit_note += flt(src.credit_note_total)
+		total_selling_total += flt(src.selling_total)
+		total_buying_amount += flt(src.buying_amount)
+		total_commission_amount += flt(src.commission_amount)
+		total_gross_profit += flt(src.gross_profit)
+		if total_selling_total:
+			total_gross_profit_percent = (total_gross_profit / total_selling_total) * 100
+		if total_buying_amount:
+			total_gross_profit_percent_on_cost = (total_gross_profit/total_buying_amount) * 100
+
 		data.append(row)
+
+	total_row = [
+        'Total', '', '', total_qty, '', '', total_selling_amount, total_credit_note,
+		total_selling_total, total_buying_amount, total_commission_amount,
+		total_gross_profit, total_gross_profit_percent, total_gross_profit_percent_on_cost,''
+	]
+
+	data.append(total_row)
 
 
 def get_columns(group_wise_columns, filters):
@@ -164,6 +230,13 @@ def get_columns(group_wise_columns, filters):
 				"fieldtype": "Link",
 				"options": "Sales Invoice",
 				"width": 120,
+			},
+			"invoice": {
+				"fieldname": "invoice",
+				"label": _("Sales Invoice"),
+				"fieldtype": "Link",
+				"options": "Sales Invoice",
+				"width": 220,
 			},
 			"posting_date": {
 				"label": _("Posting Date"),
@@ -287,6 +360,12 @@ def get_columns(group_wise_columns, filters):
 				"fieldtype": "Percent",
 				"width": 100,
 			},
+			"gross_profit_percent_on_cost": {
+				"label": _("GP % (Cost)"),
+				"fieldname": "gross_profit_%_on_cost",
+				"fieldtype": "Percent",
+				"width": 120,
+			},
 			"project": {
 				"label": _("Project"),
 				"fieldname": "project",
@@ -345,6 +424,7 @@ def get_column_names():
 	return frappe._dict(
 		{
 			"invoice_or_item": "sales_invoice",
+			"invoice": "invoice",
 			"customer": "customer",
 			"customer_group": "customer_group",
 			"posting_date": "posting_date",
@@ -366,6 +446,7 @@ def get_column_names():
 #			"incentive_amount": "incentive_amount",
 			"gross_profit": "gross_profit",
 			"gross_profit_percent": "gross_profit_%",
+			"gross_profit_percent_on_cost": "gross_profit_%_on_cost",
 			"project": "project",
 		}
 	)
@@ -380,7 +461,7 @@ class GrossProfitGenerator:
 		self.load_invoice_items()
 		self.get_delivery_notes()
 
-		if filters.group_by == "Invoice":
+		if filters.group_by in ["Invoice", "Default"]:
 			self.group_items_by_invoice(filters)
 
 		self.load_product_bundle()
@@ -395,7 +476,7 @@ class GrossProfitGenerator:
 		self.currency_precision = cint(frappe.db.get_default("currency_precision")) or 3
 		self.float_precision = cint(frappe.db.get_default("float_precision")) or 2
 
-		grouped_by_invoice = True if self.filters.get("group_by") == "Invoice" else False
+		grouped_by_invoice = True if self.filters.get("group_by") in ["Invoice", "Default"] else False
 
 		if grouped_by_invoice:
 			buying_amount = 0
@@ -457,12 +538,18 @@ class GrossProfitGenerator:
 #			row.incentive_amount = flt(row.incentive_amount, self.float_precision)
 			row.selling_total = flt(row.base_amount - row.credit_note_total, self.float_precision)
 			row.gross_profit = flt(row.selling_total - row.buying_amount - row.commission_amount, self.currency_precision)
-			if row.base_amount:
+			if row.selling_total:
 				row.gross_profit_percent = flt(
 					(row.gross_profit / row.selling_total) * 100.0, self.currency_precision
 				)
 			else:
 				row.gross_profit_percent = 0.0
+			if row.buying_amount:
+				row.gross_profit_percent_on_cost = flt(
+					(row.gross_profit / row.buying_amount) * 100.0, self.currency_precision
+ 				)
+			else:
+				row.gross_profit_percent_on_cost = 0.0
 
 			# add to grouped
 			self.grouped.setdefault(row.get(scrub(self.filters.group_by)), []).append(row)
@@ -472,7 +559,7 @@ class GrossProfitGenerator:
 
 	def get_average_rate_based_on_group_by(self):
 		for key in list(self.grouped):
-			if self.filters.get("group_by") == "Invoice":
+			if self.filters.get("group_by") in ["Invoice", "Default"]:
 				for row in self.grouped[key]:
 					if row.indent == 1.0:
 						if (
@@ -513,9 +600,9 @@ class GrossProfitGenerator:
 				self.grouped_data.append(new_row)
 
 	def is_not_invoice_row(self, row):
-		return (self.filters.get("group_by") == "Invoice" and row.indent != 0.0) or self.filters.get(
+		return (self.filters.get("group_by") in ["Invoice", "Default"] and row.indent != 0.0) or self.filters.get(
 			"group_by"
-		) != "Invoice"
+		) not in ["Invoice", "Default"]
 
 	def set_average_rate(self, new_row):
 		self.set_average_gross_profit(new_row)
@@ -531,6 +618,11 @@ class GrossProfitGenerator:
 		new_row.gross_profit_percent = (
 			flt(((new_row.gross_profit / new_row.selling_total) * 100.0), self.currency_precision)
 			if new_row.selling_total
+			else 0
+		)
+		new_row.gross_profit_percent_on_cost = (
+			flt(((new_row.gross_profit / new_row.buying_amount) * 100.0), self.currency_precision)
+			if new_row.buying_amount
 			else 0
 		)
 
@@ -556,7 +648,7 @@ class GrossProfitGenerator:
 			).append(inv)
 
 	def skip_row(self, row):
-		if self.filters.get("group_by") != "Invoice":
+		if self.filters.get("group_by") not in ["Invoice", "Default"]:
 			if not row.get(scrub(self.filters.get("group_by", ""))):
 				return True
 
@@ -843,7 +935,7 @@ class GrossProfitGenerator:
 			# initialize list with a header row for each new parent
 			grouped.setdefault(row.parent, [invoice_row]).append(
 				row.update(
-					{"indent": 1.0, "parent_invoice": row.parent, "invoice_or_item": row.item_code, 
+					{"indent": 1.0, "parent_invoice": row.parent, "invoice_or_item": row.item_code, "invoice": row.parent,
 					"credit_note_total": credit_note_for_item, "selling_total": row.base_net_amount - credit_note_for_item
 					}
 				)  # descendant rows will have indent: 1.0 or greater
@@ -907,6 +999,7 @@ class GrossProfitGenerator:
 				"indent": 0.0,
 				"invoice_or_item": row.parent,
 				"parent": None,
+				"invoice": row.parent,
 				"posting_date": row.posting_date,
 				"posting_time": row.posting_time,
 				"project": row.project,
@@ -919,7 +1012,7 @@ class GrossProfitGenerator:
 				"warehouse": None,
 				"item_group": None,
 				"sales_partner_name": None,
-				"brand": None,
+#				"brand": None,
 				"dn_detail": None,
 				"delivery_note": None,
 				"qty": None,

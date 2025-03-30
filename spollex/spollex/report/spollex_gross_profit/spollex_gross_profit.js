@@ -36,8 +36,8 @@ frappe.query_reports["Spollex Gross Profit"] = {
 			label: __("Group By"),
 			fieldtype: "Select",
 			options:
-				"Invoice\nItem Code",
-			default: "Invoice",
+				"Default\nInvoice\nItem Code",
+			default: "Default",
 		},
 		{
 			fieldname: "item_group",
