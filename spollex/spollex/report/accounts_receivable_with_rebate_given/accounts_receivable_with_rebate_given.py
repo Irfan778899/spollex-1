@@ -498,6 +498,11 @@ class ReceivablePayableReport:
 				(self.filters.report_date, self.filters.company),
 				as_dict=1,
 			):
+				po = frappe.db.get_all('Purchase Invoice Item',filters={'parent': pi.name},fields=['distinct purchase_order'])
+				po_list = [
+					f'<a href="/app/purchase-order/{po.purchase_order}" target="_blank">{po.purchase_order}</a>'
+					for po in po if po.purchase_order
+					]
 
 				default_payable_account = frappe.db.get_value('Company', self.filters.company, 'default_payable_account')
 
@@ -524,6 +529,7 @@ class ReceivablePayableReport:
 
 				debit_note_total = debit_note_total[0][0] or 0 if debit_note_total else 0
 				pi["rebate_received"] = debit_note_total
+				pi["purchase_order"] = ", ".join(po_list)
 
 				self.invoice_details.setdefault(pi.name, pi)
 
@@ -1131,6 +1137,7 @@ class ReceivablePayableReport:
 		self.add_column(label="Due Date", fieldtype="Date")
 
 		if self.account_type == "Payable":
+			self.add_column(label=_("Purchase Order"), fieldname="purchase_order", fieldtype="Data")
 			self.add_column(label=_("Bill No"), fieldname="bill_no", fieldtype="Data")
 			self.add_column(label=_("Bill Date"), fieldname="bill_date", fieldtype="Date")
 
