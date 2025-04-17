@@ -500,7 +500,7 @@ class ReceivablePayableReport:
 			):
 				po = frappe.db.get_all('Purchase Invoice Item',filters={'parent': pi.name},fields=['distinct purchase_order'])
 				po_list = [
-					f'<a href="/app/purchase-order/{po.purchase_order}" target="_blank">{po.purchase_order}</a>'
+					f'<a href="/app/purchase-order/{po.purchase_order}" style="display:block; text-align:left;">{po.purchase_order}</a>'
 					for po in po if po.purchase_order
 					]
 
@@ -1137,7 +1137,7 @@ class ReceivablePayableReport:
 		self.add_column(label="Due Date", fieldtype="Date")
 
 		if self.account_type == "Payable":
-			self.add_column(label=_("Purchase Order"), fieldname="purchase_order", fieldtype="Data")
+			self.add_column(label=_("Purchase Order"), fieldname="purchase_order", fieldtype="Data", width="180")
 			self.add_column(label=_("Bill No"), fieldname="bill_no", fieldtype="Data")
 			self.add_column(label=_("Bill Date"), fieldname="bill_date", fieldtype="Date")
 
