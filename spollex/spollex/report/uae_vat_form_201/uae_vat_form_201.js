@@ -1,7 +1,7 @@
-// Copyright (c) 2024, 4C Solutions and contributors
+// Copyright (c) 2025, 4C Solutions and contributors
 // For license information, please see license.txt
 
-frappe.query_reports["Spollex UAE VAT 201"] = {
+frappe.query_reports["UAE VAT Form 201"] = {
 	filters: [
 		{
 			fieldname: "company",

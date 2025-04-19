@@ -1,4 +1,4 @@
-# Copyright (c) 2024, 4C Solutions and contributors
+# Copyright (c) 2025, 4C Solutions and contributors
 # For license information, please see license.txt
 
 import frappe
@@ -647,7 +647,7 @@ def get_vat_debit_totals(filters):
 		"Journal Entry Account",
 		filters={
 			"parent": ["in", journal_entry_names],
-			"account": ["like", "%VAT%"],  # Match VAT accounts
+			"account": ["like", "%Input VAT%"],  # Match VAT accounts
 			"debit": [">", 0],
 		},
 		fields=["parent", "debit"]
