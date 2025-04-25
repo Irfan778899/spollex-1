@@ -1,0 +1,68 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-04-20 23:15:36.359313",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "description",
+  "pending_ordered_qty",
+  "preparation_date",
+  "collection_qty",
+  "po_detail"
+ ],
+ "fields": [
+  {
+   "fetch_from": "item.description",
+   "fieldname": "description",
+   "fieldtype": "Text Editor",
+   "in_list_view": 1,
+   "label": "Description"
+  },
+  {
+   "fieldname": "pending_ordered_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Pending Ordered Qty"
+  },
+  {
+   "fieldname": "preparation_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Preparation Date"
+  },
+  {
+   "fieldname": "collection_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Collection Qty"
+  },
+  {
+   "fieldname": "po_detail",
+   "fieldtype": "Data",
+   "label": "PO Detail"
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item Code",
+   "options": "Item"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-04-27 20:53:01.293462",
+ "modified_by": "Administrator",
+ "module": "spollex",
+ "name": "Shipment Tracker Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
