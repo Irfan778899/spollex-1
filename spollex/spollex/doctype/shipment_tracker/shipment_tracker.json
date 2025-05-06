@@ -11,12 +11,13 @@
   "supplier",
   "forwarder",
   "column_break_gyoa",
+  "date",
   "collection_date",
-  "packaging_list",
-  "etd",
+  "packing_list",
   "column_break_xmwk",
   "status",
   "invoice_date",
+  "etd",
   "eta",
   "actual_received_date",
   "section_break_dxro",
@@ -27,6 +28,7 @@
    "fieldname": "purchase_order",
    "fieldtype": "Link",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Purchase Order",
    "options": "Purchase Order",
    "reqd": 1
@@ -41,6 +43,7 @@
   {
    "fieldname": "forwarder",
    "fieldtype": "Link",
+   "in_standard_filter": 1,
    "label": "Forwarder",
    "options": "Supplier"
   },
@@ -54,19 +57,17 @@
    "label": "Collection Date"
   },
   {
-   "fieldname": "packaging_list",
-   "fieldtype": "Data",
-   "label": "Packaging List"
-  },
-  {
    "fieldname": "column_break_xmwk",
    "fieldtype": "Column Break"
   },
   {
    "fieldname": "status",
    "fieldtype": "Select",
+   "hidden": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Status",
-   "options": "Open\nRequested for Collection\nReady for Pickup\nPickup Scheduled\nReceived"
+   "options": "Open\nPickup Scheduled\nIn Transit\nReceived"
   },
   {
    "fieldname": "invoice_date",
@@ -105,12 +106,25 @@
    "hidden": 1,
    "label": "Series",
    "options": "SPX-ST-.YY.-.####"
+  },
+  {
+   "default": "Today",
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "packing_list",
+   "fieldtype": "Attach",
+   "label": "Packing List"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-04-27 20:36:32.930377",
+ "modified": "2025-05-06 19:01:23.286778",
  "modified_by": "Administrator",
  "module": "spollex",
  "name": "Shipment Tracker",
@@ -130,6 +144,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

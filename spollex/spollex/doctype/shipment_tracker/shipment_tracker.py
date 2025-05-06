@@ -14,11 +14,9 @@ class ShipmentTracker(Document):
 		if self.actual_received_date:
 			self.status = "Received"
 		elif self.etd:
-			self.status = "Pickup Scheduled"
-		elif self.invoice_date:
-			self.status = "Ready for Pickup"
+			self.status = "In Transit"
 		elif self.collection_date:
-			self.status = "Requested for Collection"
+			self.status = "Pickup Scheduled"
 		else:
 			self.status = "Open"
 
