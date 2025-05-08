@@ -768,6 +768,7 @@ class ReceivablePayableReport:
 
 		row.remaining_balance = row.outstanding
 		row.future_amount = 0.0
+		row.days_until_pdc = []
 		for future in self.future_payments.get((row.voucher_no, row.party), []):
 			if self.filters.in_party_currency:
 				future_amount_field = "future_amount"
@@ -788,6 +789,7 @@ class ReceivablePayableReport:
 					cstr(future.future_ref) + "/" + cstr(future.future_date)
 				)
 
+				row.days_until_pdc = (getdate(future.future_date) - getdate(nowdate())).days
 		if row.future_ref:
 			row.future_ref = ", ".join(row.future_ref)
 
@@ -1164,9 +1166,10 @@ class ReceivablePayableReport:
 		)
 
 		if self.filters.show_future_payments:
-			self.add_column(label=_("Future Payment Ref"), fieldname="future_ref", fieldtype="Data")
-			self.add_column(label=_("Future Payment Amount"), fieldname="future_amount")
+			self.add_column(label=_("PDC Payment Ref"), fieldname="future_ref", fieldtype="Data")
+			self.add_column(label=_("PDC Payment Amount"), fieldname="future_amount")
 			self.add_column(label=_("Remaining Balance"), fieldname="remaining_balance")
+			self.add_column(label=_("Days Until PDC"), fieldname="days_until_pdc", fieldtype="Int")
 
 		if self.filters.account_type == "Receivable":
 			self.add_column(label=_("Customer LPO"), fieldname="po_no", fieldtype="Data")
