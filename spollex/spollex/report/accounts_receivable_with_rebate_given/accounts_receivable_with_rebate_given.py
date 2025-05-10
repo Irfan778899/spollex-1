@@ -448,6 +448,7 @@ class ReceivablePayableReport:
 						sum(`tabJournal Entry Account`.credit_in_account_currency)
 					from
 						`tabJournal Entry Account`
+					join `tabJournal Entry` on `tabJournal Entry`.name = `tabJournal Entry Account`.parent
 					where
 						`tabJournal Entry Account`.parent in (
 							select
@@ -460,6 +461,7 @@ class ReceivablePayableReport:
 						)
 						and `tabJournal Entry Account`.account = %s
 						and `tabJournal Entry Account`.docstatus = 1
+						and `tabJournal Entry`.voucher_type = 'Credit Note';
 					""", (d.name, default_receivable_account)
 				)
 
