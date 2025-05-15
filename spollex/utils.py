@@ -320,3 +320,12 @@ def send_email_notification(template_name, recipients, doc_args, doctype, docnam
         reference_doctype=doctype,
         reference_name=docname,
     )
+
+def update_shipment_tracker_status():
+    shipment_trackers = frappe.get_all("Shipment Tracker", filters={"status": ["!=", "Received"]}, fields=["name"])
+
+    for tracker in shipment_trackers:
+        shipment_tracker = frappe.get_doc("Shipment Tracker", tracker.name)
+        shipment_tracker.set_status()
+        shipment_tracker.save()
+    frappe.db.commit()

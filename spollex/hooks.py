@@ -195,7 +195,8 @@ doc_events = {
 schedular_events = {
     "daily": [
         "spollex.utils.send_warranty_expiry_notification",
-        "spollex.utils.send_subscription_expiry_notification"
+        "spollex.utils.send_subscription_expiry_notification",
+        "spollex.utils.update_shipment_tracker_status"
     ],
 }
 
