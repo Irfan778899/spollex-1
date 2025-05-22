@@ -179,6 +179,9 @@ frappe.query_reports["Accounts Receivable with Rebate Given"] = {
 		if (data && data.bold) {
 			value = value.bold();
 		}
+		if (data && data.overdue && (column.fieldname==="due_date" || column.fieldname==="outstanding")) {
+			value = `<span style="color: #ff0000; ">${value}</span>`;
+		}
 		return value;
 	},
 

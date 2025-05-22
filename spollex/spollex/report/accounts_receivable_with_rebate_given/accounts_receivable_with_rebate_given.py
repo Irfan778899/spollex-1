@@ -360,13 +360,17 @@ class ReceivablePayableReport:
 				self.append_subtotal_row(self.previous_party)
 			self.previous_party = row.party
 
+		if row.due_date < getdate(nowdate()):
+			row["overdue"] = 1
 		self.data.append(row)
 
 	def set_invoice_details(self, row):
 		invoice_details = self.invoice_details.get(row.voucher_no, {})
 
 		if row.due_date:
+
 			invoice_details.pop("due_date", None)
+
 		row.update(invoice_details)
 
 		if "rebate_received" in invoice_details:
@@ -772,7 +776,7 @@ class ReceivablePayableReport:
 
 		row.remaining_balance = row.outstanding
 		row.future_amount = 0.0
-		row.days_until_pdc = []
+		row.days_until_pdc = 0
 		for future in self.future_payments.get((row.voucher_no, row.party), []):
 			if self.filters.in_party_currency:
 				future_amount_field = "future_amount"
@@ -793,7 +797,10 @@ class ReceivablePayableReport:
 					cstr(future.future_ref) + "/" + cstr(future.future_date)
 				)
 
-				row.days_until_pdc = (getdate(future.future_date) - getdate(nowdate())).days
+				if future.future_date:
+					row.days_until_pdc = max((getdate(future.future_date) - getdate(nowdate())).days, 0)
+				else:
+					row.days_until_pdc = 0
 		if row.future_ref:
 			row.future_ref = ", ".join(row.future_ref)
 
@@ -1213,7 +1220,7 @@ class ReceivablePayableReport:
 		if fieldtype == "Currency":
 			options = "currency"
 		if fieldtype == "Date":
-			width = 90
+			width = 110
 
 		self.columns.append(
 			dict(label=label, fieldname=fieldname, fieldtype=fieldtype, options=options, width=width)
