@@ -40,11 +40,14 @@ frappe.query_reports["Spollex Gross Profit"] = {
 			default: "Default",
 		},
 		{
-			fieldname: "item_group",
-			label: __("Item Group"),
-			fieldtype: "Link",
-			options: "Item Group",
-		},
+            "fieldname": "item_group",
+            "label": __("Item Group"),
+            "fieldtype": "MultiSelectList",
+            "options": "Item Group",
+            "get_data": function(txt) {
+                return frappe.db.get_link_options('Item Group', txt);
+            }
+        },
 		{
 			fieldname: "sales_person",
 			label: __("Sales Person"),

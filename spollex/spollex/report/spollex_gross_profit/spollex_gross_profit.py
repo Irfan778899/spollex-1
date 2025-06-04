@@ -6,10 +6,8 @@ from collections import OrderedDict
 import frappe
 from frappe import _, qb, scrub
 from frappe.query_builder import Order
-from frappe.utils import cint, flt, formatdate
-
+from frappe.utils import cint, flt
 from erpnext.controllers.queries import get_match_cond
-from erpnext.stock.report.stock_ledger.stock_ledger import get_item_group_condition
 from erpnext.stock.utils import get_incoming_rate
 
 
@@ -797,7 +795,8 @@ class GrossProfitGenerator:
 		conditions += " and (is_return = 0 or (is_return=1 and return_against is null))"
 
 		if self.filters.item_group:
-			conditions += f" and {get_item_group_condition(self.filters.item_group)}"
+			item_groups_list = ', '.join(f"'{group}'" for group in self.filters.item_group)
+			conditions += f" and item.item_group in ({item_groups_list})"
 
 		if self.filters.sales_person:
 			conditions += """
