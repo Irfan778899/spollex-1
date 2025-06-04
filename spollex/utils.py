@@ -4,7 +4,6 @@
 import frappe
 from frappe.utils import nowdate, add_days, formatdate
 from frappe import _
-import json
 
 @frappe.whitelist()
 def create_credit_note(rebate_amount, posting_date, reference_name):
@@ -329,3 +328,38 @@ def update_shipment_tracker_status():
         shipment_tracker.set_status()
         shipment_tracker.save()
     frappe.db.commit()
+
+@frappe.whitelist()
+def show_payments_popup():
+    today = nowdate()
+    due_date = add_days(today, 7)
+
+    invoices = frappe.get_all("Purchase Invoice",
+        filters={
+            "docstatus": 1,
+            "outstanding_amount": (">", 0),
+            "due_date": ("between", [today, due_date])
+        },
+        fields=["name", "supplier", "due_date", "outstanding_amount"]
+    )
+
+    message = [
+        ["Invoice", "Supplier", "Due Date", "Outstanding Amount"],
+    ]
+    if invoices:
+        for inv in invoices:
+            message.append([
+                inv.name,
+                inv.supplier,
+                formatdate(inv.due_date, 'dd-mm-yyyy'),
+                format(inv.outstanding_amount, '.2f')
+            ])        
+
+        primary_action = None
+        frappe.msgprint(
+            msg=message, 
+            title="Payments Due in Next 7 Days", 
+            indicator="orange",
+			primary_action=primary_action,
+            as_table=1
+        )
