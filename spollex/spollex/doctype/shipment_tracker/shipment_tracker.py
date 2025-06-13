@@ -10,6 +10,7 @@ class ShipmentTracker(Document):
 	def validate(self):
 		self.set_status()
 		self.validate_collection_qty()
+		self.set_balance_qty()
 
 	def set_status(self):
 		if self.actual_received_date and self.actual_received_date <= today():
@@ -23,9 +24,16 @@ class ShipmentTracker(Document):
 
 	def validate_collection_qty(self):
 		for item in self.items:
-			if item.collection_qty and item.pending_ordered_qty:
+			if item.pending_ordered_qty and item.collection_qty:
 				if item.collection_qty > item.pending_ordered_qty:
 					frappe.throw(f"Collection Qty ({item.collection_qty}) cannot be greater than Pending Ordered Qty ({item.pending_ordered_qty}) for item {item.item_code}.")
+
+	def set_balance_qty(self):
+		for item in self.items:
+			if item.pending_ordered_qty and item.collection_qty:
+				item.balance_qty = item.pending_ordered_qty - item.collection_qty
+			else:
+				item.balance_qty = 0
 
 @frappe.whitelist()
 def make_shipment_tracker(source_name, target_doc=None):
