@@ -4,7 +4,7 @@
 import frappe
 from frappe.model.document import Document
 from frappe.model.mapper import get_mapped_doc
-from frappe.utils import today
+from frappe.utils import getdate
 
 class ShipmentTracker(Document):
 	def validate(self):
@@ -13,11 +13,12 @@ class ShipmentTracker(Document):
 		self.set_balance_qty()
 
 	def set_status(self):
-		if self.actual_received_date and self.actual_received_date <= today():
+		today_date = getdate()
+		if self.actual_received_date and self.actual_received_date <= today_date:
 			self.status = "Received"
-		elif self.etd and self.etd <= today():
+		elif self.etd and self.etd <= today_date:
 			self.status = "In Transit"
-		elif self.collection_date and self.collection_date <= today():
+		elif self.collection_date and self.collection_date <= today_date:
 			self.status = "Pickup Scheduled"
 		else:
 			self.status = "Open"
