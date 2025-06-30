@@ -14,11 +14,15 @@ class ShipmentTracker(Document):
 
 	def set_status(self):
 		today_date = getdate()
-		if self.actual_received_date and self.actual_received_date <= today_date:
+		actual_received_date = getdate(self.actual_received_date) if self.actual_received_date else None
+		etd = getdate(self.etd) if self.etd else None
+		collection_date = getdate(self.collection_date) if self.collection_date else None
+
+		if actual_received_date and actual_received_date <= today_date:
 			self.status = "Received"
-		elif self.etd and self.etd <= today_date:
+		elif etd and etd <= today_date:
 			self.status = "In Transit"
-		elif self.collection_date and self.collection_date <= today_date:
+		elif collection_date and collection_date <= today_date:
 			self.status = "Pickup Scheduled"
 		else:
 			self.status = "Open"
@@ -32,7 +36,7 @@ class ShipmentTracker(Document):
 	def set_balance_qty(self):
 		for item in self.items:
 			if item.pending_ordered_qty and item.collection_qty:
-				item.balance_qty = item.pending_ordered_qty - item.collection_qty
+				item.balance_qty = item.pending_ordered_qty - item.collection_qty - item.approved_qty
 			else:
 				item.balance_qty = 0
 
