@@ -334,7 +334,9 @@ def show_payments_popup():
     today = nowdate()
     due_date = add_days(today, 7)
 
-    invoices = frappe.get_all("Purchase Invoice",
+    message = []
+
+    purchase_invoices = frappe.get_all("Purchase Invoice",
         filters={
             "docstatus": 1,
             "outstanding_amount": (">", 0),
@@ -343,23 +345,44 @@ def show_payments_popup():
         fields=["name", "supplier", "due_date", "outstanding_amount"]
     )
 
-    message = [
-        ["Invoice", "Supplier", "Due Date", "Outstanding Amount"],
-    ]
-    if invoices:
-        for inv in invoices:
+    if purchase_invoices:
+        message.append(["<b>Payments Due (Purchase Invoices)</b>", "", "", ""])
+        message.append(["Invoice", "Supplier", "Due Date", "Outstanding Amount"])
+        for inv in purchase_invoices:
             message.append([
                 inv.name,
                 inv.supplier,
                 formatdate(inv.due_date, 'dd-mm-yyyy'),
                 format(inv.outstanding_amount, '.2f')
-            ])        
+            ])
 
-        primary_action = None
+    sales_invoices = frappe.get_all("Sales Invoice",
+        filters={
+            "docstatus": 1,
+            "outstanding_amount": (">", 0),
+            "due_date": ("between", [today, due_date])
+        },
+        fields=["name", "customer", "due_date", "outstanding_amount"]
+    )
+
+    if sales_invoices:
+        message.append(["<b>Receipts Due (Sales Invoices)</b>", "", "", ""])
+        message.append(["Invoice", "Customer", "Due Date", "Outstanding Amount"])
+        for inv in sales_invoices:
+            message.append([
+                inv.name,
+                inv.customer,
+                formatdate(inv.due_date, 'dd-mm-yyyy'),
+                format(inv.outstanding_amount, '.2f')
+            ])
+
+    if message:
         frappe.msgprint(
-            msg=message, 
-            title="Payments Due in Next 7 Days", 
+            msg=message,
+            title="Payments/Receipts Due in Next 7 Days",
             indicator="orange",
-			primary_action=primary_action,
+            primary_action=None,
             as_table=1
         )
+    else:
+        frappe.msgprint("No Payments/Receipts due in the next 7 days.", title="No Pending Invoices", indicator="green")

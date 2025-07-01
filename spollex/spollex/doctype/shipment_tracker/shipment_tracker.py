@@ -35,7 +35,7 @@ class ShipmentTracker(Document):
 
 	def set_balance_qty(self):
 		for item in self.items:
-			if item.pending_ordered_qty and item.collection_qty:
+			if item.pending_ordered_qty:
 				item.balance_qty = item.pending_ordered_qty - item.collection_qty - item.approved_qty
 			else:
 				item.balance_qty = 0
