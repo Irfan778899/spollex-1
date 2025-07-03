@@ -1,0 +1,45 @@
+{
+ "add_total_row": 1,
+ "add_translate_data": 0,
+ "columns": [],
+ "creation": "2025-07-02 16:31:30.742204",
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [],
+ "idx": 0,
+ "is_standard": "Yes",
+ "letter_head": "Spollex",
+ "letterhead": null,
+ "modified": "2025-07-02 16:31:30.742204",
+ "modified_by": "Administrator",
+ "module": "spollex",
+ "name": "Accounts Receivable for Sales User",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "ref_doctype": "Account",
+ "reference_report": "Accounts Receivable",
+ "report_name": "Accounts Receivable for Sales User",
+ "report_type": "Script Report",
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Purchase User"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "Auditor"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "Employee Self Service"
+  }
+ ],
+ "timeout": 0
+}
