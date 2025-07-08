@@ -37,144 +37,45 @@
 		{% } %}
 		</div>
 	</div>
-
-	{% if(filters.show_future_payments) { %}
-		{% var balance_row = data.slice(-1).pop();
-			var start = report.columns.findIndex((elem) => (elem.fieldname == 'age'));
-			var range1 = report.columns[start].label;
-			var range2 = report.columns[start+1].label;
-			var range3 = report.columns[start+2].label;
-			var range4 = report.columns[start+3].label;
-			var range5 = report.columns[start+4].label;
-			var range6 = report.columns[start+5].label;
-		%}
-		{% if(balance_row) { %}
-		<table class="table table-bordered table-condensed">
-			<caption class="text-right">(Amount in {%= data[0]["currency"] || "" %})</caption>
-				<colgroup>
-					<col style="width: 30mm;">
-					<col style="width: 18mm;">
-					<col style="width: 18mm;">
-					<col style="width: 18mm;">
-					<col style="width: 18mm;">
-					<col style="width: 18mm;">
-					<col style="width: 18mm;">
-					<col style="width: 18mm;">
-				</colgroup>
-
-			<thead>
-				<tr>
-					<th>{%= __(" ") %}</th>
-					<th>{%= __(range1) %}</th>
-					<th>{%= __(range2) %}</th>
-					<th>{%= __(range3) %}</th>
-					<th>{%= __(range4) %}</th>
-					<th>{%= __(range5) %}</th>
-					<th>{%= __(range6) %}</th>
-					<th>{%= __("Total") %}</th>
-				</tr>
-			</thead>
-			<tbody>
-				<tr>
-					<td>{%= __("Total Outstanding") %}</td>
-					<td class="text-right">
-						{%= format_number(balance_row["age"], null, 2) %}
-					</td>
-					<td class="text-right">
-						{%= format_currency(balance_row["range1"], data[data.length-1]["currency"]) %}
-					</td>
-					<td class="text-right">
-						{%= format_currency(balance_row["range2"], data[data.length-1]["currency"]) %}
-					</td>
-					<td class="text-right">
-						{%= format_currency(balance_row["range3"], data[data.length-1]["currency"]) %}
-					</td>
-					<td class="text-right">
-						{%= format_currency(balance_row["range4"], data[data.length-1]["currency"]) %}
-					</td>
-					<td class="text-right">
-						{%= format_currency(balance_row["range5"], data[data.length-1]["currency"]) %}
-					</td>
-					<td class="text-right">
-						{%= format_currency(flt(balance_row["outstanding"]), data[data.length-1]["currency"]) %}
-					</td>
-				</tr>
-					<td>{%= __("Future Payments") %}</td>
-					<td></td>
-					<td></td>
-					<td></td>
-					<td></td>
-					<td></td>
-					<td></td>
-					<td class="text-right">
-						{%= format_currency(flt(balance_row[("future_amount")]), data[data.length-1]["currency"]) %}
-					</td>
-				<tr class="cvs-footer">
-					<th class="text-left">{%= __("Cheques Required") %}</th>
-					<th></th>
-					<th></th>
-					<th></th>
-					<th></th>
-					<th></th>
-					<th></th>
-					<th class="text-right">
-						{%= format_currency(flt(balance_row["outstanding"] - balance_row[("future_amount")]), data[data.length-1]["currency"]) %}</th>
-				</tr>
-			</tbody>
-
-		</table>
-		{% } %}
-	{% } %}
 	<table class="table table-bordered">
 		<thead>
 			<tr>
-				{% if(report.report_name === "Accounts Receivable for Sales User" || report.report_name === "Accounts Payable") { %}
-					<th style="width: 10%">{%= __("Posting Date") %}</th>
-					<th style="width: 4%">{%= __("Age (Days)") %}</th>
-					<th style="width: 10%">{%= __("Party Type") %}</th>
-					<th style="width: 10%">{%= __("Party") %}</th>
-					<th style="width: 10%">{%= __("Due Date") %}</th>
+				<th style="width: 10%">{%= __("Posting Date") %}</th>
+				<th style="width: 10%">{%= __("Party") %}</th>
+				<th style="width: 10%">{%= __("Due Date") %}</th>
 
-					{% if(report.report_name === "Accounts Receivable for Sales User" && filters.show_sales_person) { %}
-						<th style="width: 14%">{%= __("Reference") %}</th>
-						<th style="width: 10%">{%= __("Sales Person") %}</th>
-					{% } else { %}
-						<th style="width: 24%">{%= __("Reference") %}</th>
-					{% } %}
-					{% if(!filters.show_future_payments) { %}
-						<th style="width: 10%">{%= (filters.party) ? __("Remarks"): __("Party") %}</th>
-					{% } %}
-					<th style="width: 10%; text-align: right">{%= __("Invoiced Amount") %}</th>
-					{% if(!filters.show_future_payments) { %}
-						<th style="width: 10%; text-align: right">{%= __("Paid Amount") %}</th>
-						<th style="width: 10%; text-align: right">{%= report.report_name === "Accounts Receivable for Sales User" ? __('Credit Note') : __('Debit Note') %}</th>
-					{% } %}
-					<th style="width: 10%; text-align: right">{%= __("Outstanding Amount") %}</th>
-					{% if(filters.show_future_payments) { %}
-						{% if(report.report_name === "Accounts Receivable for Sales User") { %}
-							<th style="width: 12%">{%= __("Customer LPO No.") %}</th>
-						{% } %}
-						<th style="width: 10%">{%= __("Future Payment Ref") %}</th>
-						<th style="width: 10%">{%= __("Future Payment Amount") %}</th>
-						<th style="width: 10%">{%= __("Remaining Balance") %}</th>
-					{% } %}
+				{% if(filters.show_sales_person) { %}
+					<th style="width: 14%">{%= __("Reference") %}</th>
+					<th style="width: 10%">{%= __("Sales Person") %}</th>
 				{% } else { %}
-					<th style="width: 40%">{%= (filters.party) ? __("Remarks"): __("Party") %}</th>
-					<th style="width: 15%">{%= __("Total Invoiced Amount") %}</th>
-					<th style="width: 15%">{%= __("Total Paid Amount") %}</th>
-					<th style="width: 15%">{%= report.report_name === "Receivable Summary with Rebate Given" ? __('Credit Note Amount') : __('Debit Note Amount') %}</th>
-					<th style="width: 15%">{%= __("Total Outstanding Amount") %}</th>
+					<th style="width: 24%">{%= __("Reference") %}</th>
 				{% } %}
+				<th style="width: 10%; text-align: right">{%= __("Invoiced Amount") %}</th>
+				{% if(!filters.show_future_payments) { %}
+					<th style="width: 10%; text-align: right">{%= __("Paid Amount") %}</th>
+					<th style="width: 10%; text-align: right">{%= __('Credit Note') %}</th>
+					<th style="width: 10%; text-align: right">{%= __('Rebate Given') %}</th>
+				{% } %}
+				<th style="width: 10%; text-align: right">{%= __("Outstanding Amount") %}</th>
+				<th style="width: 4%">{%= __("Age (Days)") %}</th>
+				{% if(filters.show_future_payments) { %}
+					<th style="width: 10%">{%= __("PDF Payment Ref") %}</th>
+					<th style="width: 10%">{%= __("PDF Payment Amount") %}</th>
+					<th style="width: 10%">{%= __("Remaining Balance") %}</th>
+					<th style="width: 10%">{%= __("Days Until PDC") %}</th>
+				{% } %}
+
+				<th style="width: 15%">{%= __("Total Invoiced Amount") %}</th>
+				<th style="width: 15%">{%= __("Total Paid Amount") %}</th>
+				<th style="width: 15%">{%= __('Credit Note Amount') %}</th>
+				<th style="width: 15%">{%= __("Total Outstanding Amount") %}</th>
 			</tr>
 		</thead>
 		<tbody>
 			{% for(var i=0, l=data.length; i<l; i++) { %}
 				<tr>
-				{% if(report.report_name === "Accounts Receivable for Sales User" || report.report_name === "Accounts Payable") { %}
 					{% if(data[i]["party"]) { %}
 						<td>{%= frappe.datetime.str_to_user(data[i]["posting_date"]) %}</td>
-						<td style="text-align: right">{%= data[i]["age"] %}</td>
-						<td>{%= data[i]["party_type"] %}</td>
 						<td>{%= data[i]["party"] %}</td>
 						<td style="text-align: right;">
 							{% if frappe.datetime.get_diff(frappe.datetime.nowdate(), data[i]['due_date']) > 0 %}
@@ -191,27 +92,8 @@
 							{%= data[i]["voucher_no"] %}
 						</td>
 
-						{% if(report.report_name === "Accounts Receivable for Sales User" && filters.show_sales_person) { %}
+						{% if(filters.show_sales_person) { %}
 						<td>{%= data[i]["sales_person"] %}</td>
-						{% } %}
-
-						{% if(!filters.show_future_payments) { %}
-						<td>
-							{% if(!(filters.party)) { %}
-								{%= data[i]["party"] %}
-								{% if(data[i]["customer_name"] && data[i]["customer_name"] != data[i]["party"]) { %}
-									<br> {%= data[i]["customer_name"] %}
-								{% } else if(data[i]["supplier_name"] != data[i]["party"]) { %}
-									<br> {%= data[i]["supplier_name"] %}
-								{% } %}
-							{% } %}
-							<div>
-							{% if data[i]["remarks"] %}
-								{%= __("Remarks") %}:
-								{%= data[i]["remarks"] %}
-							{% } %}
-							</div>
-						</td>
 						{% } %}
 
 						<td style="text-align: right;">
@@ -222,6 +104,8 @@
 								{%= format_currency(data[i]["paid"], data[i]["currency"]) %}</td>
 							<td style="text-align: right">
 								{%= format_currency(data[i]["credit_note"], data[i]["currency"]) %}</td>
+							<td style="text-align: right">
+								{%= format_currency(data[i]["rebate_given"], data[i]["currency"]) %}</td>
 						{% } %}
 						<td style="text-align: right;">
 							{% if data[i]["overdue"] %}
@@ -229,23 +113,21 @@
 							{% else %}
 								{%= format_currency(data[i]["outstanding"], data[i]["currency"]) %}
 							{% endif %}
-						</td>						  
+						</td>
+						<td style="text-align: right">{%= data[i]["age"] %}</td>
 
 						{% if(filters.show_future_payments) { %}
-							{% if(report.report_name === "Accounts Receivable for Sales User") { %}
-								<td style="text-align: right">
-									{%= data[i]["po_no"] %}</td>
-							{% } %}
 							<td style="text-align: right">{%= data[i]["future_ref"] %}</td>
 							<td style="text-align: right">{%= format_currency(data[i]["future_amount"], data[i]["currency"]) %}</td>
 							<td style="text-align: right">{%= format_currency(data[i]["remaining_balance"], data[i]["currency"]) %}</td>
+							<td style="text-align: right">{%= format_currency(data[i]["days_until_pdc"], data[i]["currency"]) %}</td>
 						{% } %}
 					{% } else { %}
 						<td></td>
 						{% if(!filters.show_future_payments) { %}
 						<td></td>
 						{% } %}
-						{% if(report.report_name === "Accounts Receivable for Sales User" && filters.show_sales_person) { %}
+						{% if(filters.show_sales_person) { %}
 						<td></td>
 						{% } %}
 						<td></td>
@@ -258,43 +140,29 @@
 								{%= format_currency(data[i]["paid"], data[i]["currency"]) %}</td>
 							<td style="text-align: right">{%= format_currency(data[i]["credit_note"], data[i]["currency"]) %} </td>
 						{% } %}
-						<td style="text-align: right">
-							{%= format_currency(data[i]["outstanding"], data[i]["currency"]) %}</td>
+						<td style="text-align: right;">
+							{% if data[i]["overdue"] %}
+								<span style="color: #ff0000;">{%= format_currency(data[i]["outstanding"], data[i]["currency"]) %}</span>
+							{% else %}
+								{%= format_currency(data[i]["outstanding"], data[i]["currency"]) %}
+							{% endif %}
+						</td>
 
 						{% if(filters.show_future_payments) { %}
-							{% if(report.report_name === "Accounts Receivable for Sales User") { %}
-								<td style="text-align: right">
+							<td style="text-align: right">
 									{%= data[i]["po_no"] %}</td>
-							{% } %}
 							<td style="text-align: right">{%= data[i]["future_ref"] %}</td>
 							<td style="text-align: right">{%= format_currency(data[i]["future_amount"], data[i]["currency"]) %}</td>
 							<td style="text-align: right">{%= format_currency(data[i]["remaining_balance"], data[i]["currency"]) %}</td>
 						{% } %}
 					{% } %}
-				{% } else { %}
+
 					{% if(data[i]["party"]|| "&nbsp;") { %}
-						{% if(!data[i]["is_total_row"]) { %}
-							<td>
-								{% if(!(filters.party)) { %}
-									{%= data[i]["party"] %}
-									{% if(data[i]["customer_name"] && data[i]["customer_name"] != data[i]["party"]) { %}
-										<br> {%= data[i]["customer_name"] %}
-									{% } else if(data[i]["supplier_name"] != data[i]["party"]) { %}
-										<br> {%= data[i]["supplier_name"] %}
-									{% } %}
-								{% } %}
-								<br>{%= __("Remarks") %}:
-								{%= data[i]["remarks"] %}
-							</td>
-						{% } else { %}
-							<td><b>{%= __("Total") %}</b></td>
-						{% } %}
 						<td style="text-align: right">{%= format_currency(data[i]["invoiced"], data[i]["currency"]) %}</td>
 						<td style="text-align: right">{%= format_currency(data[i]["paid"], data[i]["currency"]) %}</td>
 						<td style="text-align: right">{%= format_currency(data[i]["credit_note"], data[i]["currency"]) %}</td>
 						<td style="text-align: right">{%= format_currency(data[i]["outstanding"], data[i]["currency"]) %}</td>
 					{% } %}
-				{% } %}
 				</tr>
 			{% } %}
 		</tbody>
