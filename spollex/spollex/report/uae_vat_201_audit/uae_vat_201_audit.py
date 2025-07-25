@@ -227,8 +227,9 @@ def get_zero_rated_sales(filters):
 			`tabSales Invoice Item` i 
 			INNER JOIN `tabSales Invoice` s ON i.parent = s.name
 		WHERE 
-			s.docstatus = 1 
+			s.docstatus = 1
 			AND s.is_opening = 'No'
+			AND s.taxes_and_charges NOT LIKE 'UAE VAT 5%%'
 			AND (i.is_zero_rated = 1 OR i.tax_amount = 0)
 			AND i.is_exempt != 1
 			{conditions}
@@ -390,7 +391,7 @@ def get_credit_note_entries(filters):
 		accounts = frappe.get_all(
 			"Journal Entry Account",
 			filters={"parent": je["name"]},
-			fields=["reference_name", "account", "account_type", "credit", "debit"]
+			fields=["reference_name", "party_type", "party", "account", "account_type", "credit", "debit"]
 		)
 
 		sales_invoice = None
@@ -399,6 +400,8 @@ def get_credit_note_entries(filters):
 		for acc in accounts:
 			if acc.account_type == "Receivable":
 				sales_invoice = acc.reference_name
+				party_type = acc.party_type
+				party = acc.party
 				total_with_vat += acc.credit or 0.0
 			elif "VAT" in acc.account:
 				vat += acc.debit or 0.0
@@ -417,8 +420,8 @@ def get_credit_note_entries(filters):
 			"posting_date": je["posting_date"],
 			"voucher_type": "Journal Entry",
 			"voucher_no": je["name"],
-			"party_type": None,
-			"party": None,
+			"party_type": party_type,
+			"party": party,
 			"taxable_amount": -flt(taxable_amount),
 			"vat_amount": -flt(vat),
 			"legend": f"Credit Note against {sales_invoice} ({emirate})",
@@ -470,7 +473,7 @@ def get_debit_note_entries(filters):
 		accounts = frappe.get_all(
 			"Journal Entry Account",
 			filters={"parent": je["name"]},
-			fields=["reference_name", "account", "account_type", "credit", "debit"]
+			fields=["reference_name", "party_type", "party", "account", "account_type", "credit", "debit"]
 		)
 
 		purchase_invoice = None
@@ -479,6 +482,8 @@ def get_debit_note_entries(filters):
 		for acc in accounts:
 			if acc.account_type == "Payable":
 				purchase_invoice = acc.reference_name
+				party_type = acc.party_type
+				party = acc.party
 				total_with_vat += acc.debit or 0.0
 			elif "VAT" in acc.account:
 				vat += acc.credit or 0.0
@@ -492,8 +497,8 @@ def get_debit_note_entries(filters):
 			"posting_date": je["posting_date"],
 			"voucher_type": "Journal Entry",
 			"voucher_no": je["name"],
-			"party_type": None,
-			"party": None,
+			"party_type": party_type,
+			"party": party,
 			"taxable_amount": -flt(taxable_amount),
 			"vat_amount": -flt(vat),
 			"legend": f"Debit Note for Purchase Invoice {purchase_invoice}",
@@ -505,17 +510,33 @@ def get_debit_note_entries(filters):
 def get_journal_entry_input_vat(filters):
 	"""Row 9 – Add Journal Entries with Input VAT as standard-rated expenses."""
 	conditions = get_conditions(filters)
-	return frappe.db.sql("""
+#	return frappe.db.sql("""
+#		SELECT
+#			je.posting_date,
+#			'Journal Entry' AS voucher_type,
+#			je.name AS voucher_no,
+#			NULL AS party,
+#			NULL AS party_type,
+#			(jea.debit * 20) AS taxable_amount,
+#			jea.debit AS vat_amount,
+#			'Other Standard Rated Expenses (from Journal Entry)' AS legend,
+#			'9' AS row_no
+#		FROM
+#			`tabJournal Entry` je
+#			INNER JOIN `tabJournal Entry Account` jea ON je.name = jea.parent
+#		WHERE
+#			je.docstatus = 1
+#			AND je.voucher_type NOT IN ('Credit Note', 'Debit Note')
+#			AND jea.account LIKE '%%Input VAT%%'
+#			AND jea.debit > 0
+#			{conditions}
+#	""".format(conditions=conditions), filters, as_dict=1)
+
+	input_vat_entries = frappe.db.sql(f"""
 		SELECT
 			je.posting_date,
-			'Journal Entry' AS voucher_type,
-			je.name AS voucher_no,
-			NULL AS party,
-			NULL AS party_type,
-			(jea.debit * 20) AS taxable_amount,
-			jea.debit AS vat_amount,
-			'Other Standard Rated Expenses (from Journal Entry)' AS legend,
-			'9' AS row_no
+			je.name AS journal_entry,
+			jea.debit
 		FROM
 			`tabJournal Entry` je
 			INNER JOIN `tabJournal Entry Account` jea ON je.name = jea.parent
@@ -525,7 +546,42 @@ def get_journal_entry_input_vat(filters):
 			AND jea.account LIKE '%%Input VAT%%'
 			AND jea.debit > 0
 			{conditions}
-	""".format(conditions=conditions), filters, as_dict=1)
+	""", filters, as_dict=1)
+
+	if not input_vat_entries:
+		return []
+
+	entries = []
+
+	for entry in input_vat_entries:
+		party_info = frappe.db.get_all(
+			"Journal Entry Account",
+			filters={
+				"parent": entry.journal_entry,
+				"party": ["!=", ""]
+			},
+			fields=["party", "party_type"],
+			limit=1
+		)
+
+		party_type = party_info[0]["party_type"] if party_info else None
+		party = party_info[0]["party"] if party_info else None
+
+		taxable_amount = flt(entry.debit * 20)
+
+		entries.append({
+			"posting_date": entry.posting_date,
+			"voucher_type": "Journal Entry",
+			"voucher_no": entry.journal_entry,
+			"party_type": party_type,
+			"party": party,
+			"taxable_amount": taxable_amount,
+			"vat_amount": flt(entry.debit),
+			"legend": "Other Standard Rated Expenses (from Journal Entry)",
+			"row_no": "9"
+		})
+
+	return entries
 
 
 
