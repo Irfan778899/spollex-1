@@ -204,9 +204,9 @@ def get_gross_profit_loss(income, direct_expense, period_list, company, currency
 	for period in period_list:
 		key = period if consolidated else period.key
 		total_income = flt(income[-2][key], 3) if income else 0
-		direct_expense = flt(direct_expense[0][key], 3) if direct_expense else 0
+		total_direct_expense = flt(direct_expense[0][key], 3) if direct_expense else 0
 		
-		gross_profit_loss[key] = total_income - direct_expense
+		gross_profit_loss[key] = total_income - total_direct_expense
 
 		if gross_profit_loss[key]:
 			has_value = True
