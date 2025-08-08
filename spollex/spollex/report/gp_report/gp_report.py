@@ -1,4 +1,4 @@
-# Copyright (c) 2024, 4C Solutions and contributors
+# Copyright (c) 2025, 4C Solutions and contributors
 # For license information, please see license.txt
 
 from collections import OrderedDict
@@ -24,17 +24,16 @@ def execute(filters=None):
 		{
 			"default": [
 				"invoice_or_item",
-				"invoice",
 				"customer",
-				"customer_group",
+#				"customer_group",
 				"posting_date",
 				"item_code",
 				"item_name",
 				"item_group",
-				"sales_partner_name",
+#				"sales_partner_name",
 #				"brand",
-				"description",
-				"warehouse",
+#				"description",
+#				"warehouse",
 				"qty",
 				"base_rate",
 				"buying_rate",
@@ -48,6 +47,7 @@ def execute(filters=None):
 				"gross_profit_percent",
 				"gross_profit_percent_on_cost",
 #				"project",
+				"stock_creation_documents"
 			],
 			"invoice": [
 				"invoice_or_item",
@@ -74,6 +74,7 @@ def execute(filters=None):
 				"gross_profit_percent",
 				"gross_profit_percent_on_cost",
 #				"project",
+				"stock_creation_documents"
 			],
 			"item_code": [
 				"item_code",
@@ -100,7 +101,6 @@ def execute(filters=None):
 
 	if filters.group_by in ["Invoice", "Default"]:
 		get_data_when_grouped_by_invoice(columns, gross_profit_data, filters, group_wise_columns, data)
-
 	else:
 		get_data_when_not_grouped_by_invoice(gross_profit_data, filters, group_wise_columns, data)
 
@@ -109,24 +109,15 @@ def execute(filters=None):
 def get_data_when_grouped_by_invoice(columns, gross_profit_data, filters, group_wise_columns, data):
 	column_names = get_column_names()
 
-	# to display item as Item Code: Item Name
-	columns[0] = "Sales Invoice:Link/Item:300"
-	if filters.group_by == "Default":
-		columns[0] = "Item Code:Link/Item:200"
 	# removing Item Code and Item Name columns
-	del columns[4:6]
+	if filters.group_by == "Invoice":
+		columns[0] = "Sales Invoice:Link/Item:300"
+		del columns[4:6]
+	else:
+		# to have Sales Invoice as link field in the first column
+		columns[0] = "Sales Invoice:Link/Sales Invoice:300"
 
-	total_qty = 0.0
-#	total_avg_selling_rate = 0.0
-#	total_valuation_rate = 0.0
-	total_selling_amount = 0.0
-	total_credit_note = 0.0
-	total_selling_total = 0.0
-	total_buying_amount = 0.0
-	total_commission_amount = 0.0
-	total_gross_profit = 0.0
-	total_gross_profit_percent = 0.0
-	total_gross_profit_percent_on_cost = 0.0
+	totals = init_totals()
 
 	for src in gross_profit_data.si_list:
 		row = frappe._dict()
@@ -138,50 +129,33 @@ def get_data_when_grouped_by_invoice(columns, gross_profit_data, filters, group_
 			row[column_names[col]] = src.get(col)
 
 		if src.indent != 1:
-			total_qty += flt(src.qty)
-#			total_avg_selling_rate += flt(src.base_rate)
-#			total_valuation_rate += flt(src.buying_rate)
-			total_selling_amount += flt(src.base_amount)
-			total_credit_note += flt(src.credit_note_total)
-			total_selling_total += flt(src.selling_total)
-			total_buying_amount += flt(src.buying_amount)
-			total_commission_amount += flt(src.commission_amount)
-			total_gross_profit += flt(src.gross_profit)
+			update_totals(totals, src)
+
 		if filters.group_by == "Invoice":
 			data.append(row)
 		elif filters.group_by == "Default" and row.indent == 1:
 			data.append(row)
-	if total_selling_total:
-		total_gross_profit_percent = (total_gross_profit / total_selling_total) * 100
-	if total_buying_amount:
-		total_gross_profit_percent_on_cost = (total_gross_profit/total_buying_amount) * 100
+	calculate_gross_profit_percentages(totals)
 
 	total_row = frappe._dict()
 	total_row["sales_invoice"] = "Total"
 	total_row["qty"] = None
 	total_row["avg._selling_rate"] = None
 	total_row["valuation_rate"] = None
-	total_row["selling_amount"] = total_selling_amount
-	total_row["credit_note_total"] = total_credit_note
-	total_row["selling_total"] = total_selling_total
-	total_row["buying_amount"] = total_buying_amount
-	total_row["commission_amount"] = total_commission_amount
-	total_row["gross_profit"] = total_gross_profit
-	total_row["gross_profit_%"] = total_gross_profit_percent
-	total_row["gross_profit_%_on_cost"] = total_gross_profit_percent_on_cost
+	total_row["selling_amount"] = totals["selling_amount"]
+	total_row["credit_note_total"] = totals["credit_note_total"]
+	total_row["selling_total"] = totals["selling_total"]
+	total_row["buying_amount"] = totals["buying_amount"]
+	total_row["commission_amount"] = totals["commission_amount"]
+	total_row["gross_profit"] = totals["gross_profit"]
+	total_row["gross_profit_%"] = totals["gross_profit_percent"]
+	total_row["gross_profit_%_on_cost"] = totals["gross_profit_percent_on_cost"]
 
 	data.append(total_row)
 
 def get_data_when_not_grouped_by_invoice(gross_profit_data, filters, group_wise_columns, data):
-	total_qty = 0.0
-	total_selling_amount = 0.0
-	total_credit_note = 0.0
-	total_selling_total = 0.0
-	total_buying_amount = 0.0
-	total_commission_amount = 0.0
-	total_gross_profit = 0.0
-	total_gross_profit_percent = 0.0
-	total_gross_profit_percent_on_cost = 0.0
+	totals = init_totals()
+	
 	for src in gross_profit_data.grouped_data:
 		row = []
 		for col in group_wise_columns.get(scrub(filters.group_by)):
@@ -189,28 +163,50 @@ def get_data_when_not_grouped_by_invoice(gross_profit_data, filters, group_wise_
 
 		row.append(filters.currency)
 
-		total_qty += flt(src.qty)
-		total_selling_amount += flt(src.base_amount)
-		total_credit_note += flt(src.credit_note_total)
-		total_selling_total += flt(src.selling_total)
-		total_buying_amount += flt(src.buying_amount)
-		total_commission_amount += flt(src.commission_amount)
-		total_gross_profit += flt(src.gross_profit)
-		if total_selling_total:
-			total_gross_profit_percent = (total_gross_profit / total_selling_total) * 100
-		if total_buying_amount:
-			total_gross_profit_percent_on_cost = (total_gross_profit/total_buying_amount) * 100
+		update_totals(totals, src)
+
+		calculate_gross_profit_percentages(totals)
 
 		data.append(row)
 
 	total_row = [
-        'Total', '', '', total_qty, '', '', total_selling_amount, total_credit_note,
-		total_selling_total, total_buying_amount, total_commission_amount,
-		total_gross_profit, total_gross_profit_percent, total_gross_profit_percent_on_cost,''
+		'Total', '', '', totals["qty"], '', '', totals["selling_amount"], totals["credit_note_total"],
+		totals["selling_total"], totals["buying_amount"], totals["commission_amount"],
+		totals["gross_profit"], totals["gross_profit_percent"], totals["gross_profit_percent_on_cost"], ''
 	]
 
 	data.append(total_row)
 
+def init_totals():
+	return {
+		"qty": 0.0,
+		"selling_amount": 0.0,
+		"credit_note_total": 0.0,
+		"selling_total": 0.0,
+		"buying_amount": 0.0,
+		"commission_amount": 0.0,
+		"gross_profit": 0.0,
+		"gross_profit_percent": 0.0,
+		"gross_profit_percent_on_cost": 0.0
+	}
+
+
+def update_totals(totals, src):
+	totals["qty"] += flt(src.qty)
+	totals["selling_amount"] += flt(src.base_amount)
+	totals["credit_note_total"] += flt(src.credit_note_total)
+	totals["selling_total"] += flt(src.selling_total)
+	totals["buying_amount"] += flt(src.buying_amount)
+	totals["commission_amount"] += flt(src.commission_amount)
+	totals["gross_profit"] += flt(src.gross_profit)
+
+
+def calculate_gross_profit_percentages(totals):
+	if totals["selling_total"]:
+		totals["gross_profit_percent"] = (totals["gross_profit"] / totals["selling_total"]) * 100
+	if totals["buying_amount"]:
+		totals["gross_profit_percent_on_cost"] = (totals["gross_profit"] / totals["buying_amount"]) * 100
+	
 
 def get_columns(group_wise_columns, filters):
 	columns = []
@@ -228,13 +224,6 @@ def get_columns(group_wise_columns, filters):
 				"fieldtype": "Link",
 				"options": "Sales Invoice",
 				"width": 120,
-			},
-			"invoice": {
-				"fieldname": "invoice",
-				"label": _("Sales Invoice"),
-				"fieldtype": "Link",
-				"options": "Sales Invoice",
-				"width": 220,
 			},
 			"posting_date": {
 				"label": _("Posting Date"),
@@ -399,6 +388,12 @@ def get_columns(group_wise_columns, filters):
 				"options": "Territory",
 				"width": 100,
 			},
+			"stock_creation_documents": {
+				"label": _("Stock Creation Documents(Serialized)"),
+				"fieldname": "stock_creation_documents",
+				"fieldtype": "Data",
+				"width": 400,
+			},
 		}
 	)
 
@@ -422,7 +417,6 @@ def get_column_names():
 	return frappe._dict(
 		{
 			"invoice_or_item": "sales_invoice",
-			"invoice": "invoice",
 			"customer": "customer",
 			"customer_group": "customer_group",
 			"posting_date": "posting_date",
@@ -446,6 +440,7 @@ def get_column_names():
 			"gross_profit_percent": "gross_profit_%",
 			"gross_profit_percent_on_cost": "gross_profit_%_on_cost",
 			"project": "project",
+			"stock_creation_documents": "stock_creation_documents"
 		}
 	)
 
@@ -484,6 +479,10 @@ class GrossProfitGenerator:
 				continue
 
 			row.base_amount = flt(row.base_net_amount, self.currency_precision)
+
+			row.stock_creation_documents = self.get_stock_creation_documents(
+				row.parent, row.item_code, row.warehouse, row.posting_date, row.item_row
+			)
 
 			product_bundles = []
 			if row.update_stock:
@@ -931,10 +930,12 @@ class GrossProfitGenerator:
 			if invoice_base_net_total:
 				credit_note_for_item = (row.base_net_amount / invoice_base_net_total) * credit_note_total
 
+			invoice_or_item = row.item_code if filters.group_by == "Invoice" else row.parent
+
 			# initialize list with a header row for each new parent
 			grouped.setdefault(row.parent, [invoice_row]).append(
 				row.update(
-					{"indent": 1.0, "parent_invoice": row.parent, "invoice_or_item": row.item_code, "invoice": row.parent,
+					{"indent": 1.0, "parent_invoice": row.parent, "invoice_or_item": invoice_or_item,
 					"credit_note_total": credit_note_for_item, "selling_total": row.base_net_amount - credit_note_for_item
 					}
 				)  # descendant rows will have indent: 1.0 or greater
@@ -998,7 +999,6 @@ class GrossProfitGenerator:
 				"indent": 0.0,
 				"invoice_or_item": row.parent,
 				"parent": None,
-				"invoice": row.parent,
 				"posting_date": row.posting_date,
 				"posting_time": row.posting_time,
 				"project": row.project,
@@ -1139,3 +1139,62 @@ class GrossProfitGenerator:
 			"""select name from tabItem
 			where is_stock_item=0"""
 		)
+
+	def get_stock_creation_documents(self, sales_invoice, item_code, warehouse, posting_date, item_row):
+		if not (item_code and warehouse and posting_date):
+			return ""
+
+		row_related = []
+		doc = frappe.get_doc("Sales Invoice", sales_invoice)
+
+		if doc.update_stock:
+			for item in doc.items:
+				if item.item_code == item_code and item.warehouse == warehouse and item.name == item_row:
+					bundle = item.serial_and_batch_bundle
+					if bundle:
+						related = self.get_creation_docs_from_bundle(bundle)
+						row_related.append(
+							", ".join(f"{doc} ({count})" for doc, count in sorted(related.items()))
+						)
+
+		else:
+			for item in doc.items:
+				if item.item_code == item_code and item.warehouse == warehouse and item.delivery_note and item.name == item_row:
+					bundle = frappe.db.get_value(
+						"Delivery Note Item",
+						{"parent": item.delivery_note, "item_code": item_code},
+						"serial_and_batch_bundle"
+					)
+					if bundle:
+						related = self.get_creation_docs_from_bundle(bundle)
+						row_related.append(
+							", ".join(f"{doc} ({count})" for doc, count in sorted(related.items()))
+						)
+
+				elif item.item_code == item_code and item.warehouse == warehouse and item.name == item_row:
+					dn_items = frappe.get_all(
+						"Delivery Note Item",
+						filters={"against_sales_invoice": sales_invoice, "item_code": item_code, "warehouse": warehouse},
+						fields=["parent", "serial_and_batch_bundle"]
+					)
+					for item in dn_items:
+						bundle = item.serial_and_batch_bundle
+						if bundle:
+							related = self.get_creation_docs_from_bundle(bundle)
+							row_related.append(
+								", ".join(f"{doc} ({count})" for doc, count in sorted(related.items()))
+							)
+
+		return "; ".join(row_related) if row_related else None
+
+	def get_creation_docs_from_bundle(self, bundle):
+		related = {}
+		serial_nos = frappe.get_all("Serial and Batch Entry", filters={"parent": bundle}, fields=["serial_no"])
+		for nos in serial_nos:
+			creation = frappe.db.get_value("Serial No", nos["serial_no"], "purchase_document_no")
+			if creation:
+				related[creation] = related.get(creation, 0) + 1
+		return related
+
+
+
