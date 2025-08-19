@@ -84,7 +84,6 @@ frappe.query_reports["GP Report"] = {
 			var $value = $(value).css("font-weight", "bold");
 			value = $value.wrap("<p></p>").parent().html();
 		}
-
 		return value;
 	},
 };

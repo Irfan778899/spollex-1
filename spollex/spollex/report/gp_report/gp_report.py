@@ -128,12 +128,10 @@ def get_data_when_grouped_by_invoice(columns, gross_profit_data, filters, group_
 		for col in group_wise_columns.get(scrub(filters.group_by)):
 			row[column_names[col]] = src.get(col)
 
-		if src.indent != 1:
+		if src.indent == 1:
 			update_totals(totals, src)
 
-		if filters.group_by == "Invoice":
-			data.append(row)
-		elif filters.group_by == "Default" and row.indent == 1:
+		if filters.group_by == "Invoice" or (filters.group_by == "Default" and src.indent == 1):
 			data.append(row)
 	calculate_gross_profit_percentages(totals)
 
@@ -473,6 +471,7 @@ class GrossProfitGenerator:
 
 		if grouped_by_invoice:
 			buying_amount = 0
+			base_amount = 0
 
 		for row in reversed(self.si_list):
 			if self.skip_row(row):
@@ -514,12 +513,11 @@ class GrossProfitGenerator:
 			else:
 				row.buying_amount = flt(self.get_buying_amount(row, row.item_code), self.currency_precision)
 
-			if grouped_by_invoice:
-				if row.indent == 1.0:
-					buying_amount += row.buying_amount
-				elif row.indent == 0.0:
-					row.buying_amount = buying_amount
-					buying_amount = 0
+			if grouped_by_invoice and row.indent == 0.0:
+				row.buying_amount = buying_amount
+				row.base_amount = base_amount
+				buying_amount = 0
+				base_amount = 0
 
 			# get buying rate
 			if flt(row.qty):
@@ -528,6 +526,13 @@ class GrossProfitGenerator:
 			else:
 				if self.is_not_invoice_row(row):
 					row.buying_rate, row.base_rate = 0.0, 0.0
+
+			if self.is_not_invoice_row(row):
+				self.update_return_invoices(row)
+
+			if grouped_by_invoice and row.indent == 1.0:
+				buying_amount += row.buying_amount
+				base_amount += row.base_amount
 
 			# calculate gross profit
 			row.credit_note_total = flt(row.credit_note_total, self.float_precision)
@@ -553,6 +558,26 @@ class GrossProfitGenerator:
 
 		if self.grouped:
 			self.get_average_rate_based_on_group_by()
+
+	def update_return_invoices(self, row):
+		if row.parent in self.returned_invoices and row.item_code in self.returned_invoices[row.parent]:
+			returned_item_rows = self.returned_invoices[row.parent][row.item_code]
+			for returned_item_row in returned_item_rows:
+				# returned_items 'qty' should be stateful
+				if returned_item_row.qty != 0:
+					if row.qty >= abs(returned_item_row.qty):
+						row.qty += returned_item_row.qty
+						row.base_amount += flt(returned_item_row.base_amount, self.currency_precision)
+						returned_item_row.qty = 0
+						returned_item_row.base_amount = 0
+
+					else:
+						row.qty = 0
+						row.base_amount = 0
+						returned_item_row.qty += row.qty
+						returned_item_row.base_amount += row.base_amount
+
+			row.buying_amount = flt(flt(row.qty) * flt(row.buying_rate), self.currency_precision)
 
 	def get_average_rate_based_on_group_by(self):
 		for key in list(self.grouped):
@@ -828,6 +853,7 @@ class GrossProfitGenerator:
 				`tabSales Invoice`.project, `tabSales Invoice`.update_stock,
 				`tabSales Invoice`.customer, `tabSales Invoice`.customer_group,
 				`tabSales Invoice`.territory, `tabSales Invoice Item`.item_code,
+				`tabSales Invoice`.base_net_total as "invoice_base_net_total",
 				`tabSales Invoice Item`.item_name, `tabSales Invoice Item`.description,
 				`tabSales Invoice Item`.warehouse, `tabSales Invoice Item`.item_group,
 				`tabSales Partner Details`.sales_partner_name,
@@ -924,11 +950,11 @@ class GrossProfitGenerator:
 			invoice_row = self.get_invoice_row(row, filters)
 
 			credit_note_total = invoice_row.get("credit_note_total", 0)
-			invoice_base_net_total = invoice_row.get("base_net_amount", 0)
+			invoice_total = invoice_row.get("base_net_amount", 0)
 
 			credit_note_for_item = 0
-			if invoice_base_net_total:
-				credit_note_for_item = (row.base_net_amount / invoice_base_net_total) * credit_note_total
+			if invoice_total:
+				credit_note_for_item = (row.base_net_amount / invoice_total) * credit_note_total
 
 			invoice_or_item = row.item_code if filters.group_by == "Invoice" else row.parent
 
@@ -1018,9 +1044,9 @@ class GrossProfitGenerator:
 				"item_row": None,
 				"is_return": row.is_return,
 				"cost_center": row.cost_center,
-				"base_net_amount": frappe.db.get_value("Sales Invoice", row.parent, "base_net_total"),
+				"base_net_amount": row.invoice_base_net_total,
 				"credit_note_total": credit_note_total,
-				"selling_total": frappe.db.get_value("Sales Invoice", row.parent, "base_net_total") - credit_note_total,
+				"selling_total": row.invoice_base_net_total - credit_note_total,
 				"commission_amount": total_commission_amount,
 #				"incentive_amount": total_incentive_amount
 			}
@@ -1145,55 +1171,52 @@ class GrossProfitGenerator:
 			return ""
 
 		row_related = []
-		doc = frappe.get_doc("Sales Invoice", sales_invoice)
+		si_items = frappe.get_all(
+			"Sales Invoice Item",
+			filters={"parent": sales_invoice, "item_code": item_code, "warehouse": warehouse, "name": item_row},
+			fields=["serial_and_batch_bundle", "delivery_note"]
+		)
 
-		if doc.update_stock:
-			for item in doc.items:
-				if item.item_code == item_code and item.warehouse == warehouse and item.name == item_row:
-					bundle = item.serial_and_batch_bundle
-					if bundle:
-						related = self.get_creation_docs_from_bundle(bundle)
-						row_related.append(
-							", ".join(f"{doc} ({count})" for doc, count in sorted(related.items()))
-						)
-
-		else:
-			for item in doc.items:
-				if item.item_code == item_code and item.warehouse == warehouse and item.delivery_note and item.name == item_row:
-					bundle = frappe.db.get_value(
-						"Delivery Note Item",
-						{"parent": item.delivery_note, "item_code": item_code},
-						"serial_and_batch_bundle"
-					)
-					if bundle:
-						related = self.get_creation_docs_from_bundle(bundle)
-						row_related.append(
-							", ".join(f"{doc} ({count})" for doc, count in sorted(related.items()))
-						)
-
-				elif item.item_code == item_code and item.warehouse == warehouse and item.name == item_row:
-					dn_items = frappe.get_all(
-						"Delivery Note Item",
-						filters={"against_sales_invoice": sales_invoice, "item_code": item_code, "warehouse": warehouse},
-						fields=["parent", "serial_and_batch_bundle"]
-					)
-					for item in dn_items:
-						bundle = item.serial_and_batch_bundle
-						if bundle:
-							related = self.get_creation_docs_from_bundle(bundle)
-							row_related.append(
-								", ".join(f"{doc} ({count})" for doc, count in sorted(related.items()))
-							)
+		for si_item in si_items:
+			bundle = si_item.serial_and_batch_bundle
+			if bundle:
+				related = self.get_creation_docs_from_bundle(bundle)
+				row_related.append(", ".join(f"{doc} ({count})" for doc, count in sorted(related.items())))
+			elif si_item.delivery_note:
+				dn_items = frappe.get_all(
+					"Delivery Note Item",
+					filters={"parent": si_item.delivery_note, "item_code": item_code, "warehouse": warehouse,},
+					fields=["serial_and_batch_bundle"]
+				)
+				for dn in dn_items:
+					if dn.serial_and_batch_bundle:
+						related = self.get_creation_docs_from_bundle(dn.serial_and_batch_bundle)
+						row_related.append(", ".join(f"{doc} ({count})" for doc, count in sorted(related.items())))
+			else:
+				dn_items = frappe.get_all(
+					"Delivery Note Item",
+					filters={"against_sales_invoice": sales_invoice, "item_code": item_code, "warehouse": warehouse},
+					fields=["serial_and_batch_bundle"]
+				)
+				for dn in dn_items:
+					if dn.serial_and_batch_bundle:
+						related = self.get_creation_docs_from_bundle(dn.serial_and_batch_bundle)
+						row_related.append(", ".join(f"{doc} ({count})" for doc, count in sorted(related.items())))
 
 		return "; ".join(row_related) if row_related else None
 
 	def get_creation_docs_from_bundle(self, bundle):
 		related = {}
-		serial_nos = frappe.get_all("Serial and Batch Entry", filters={"parent": bundle}, fields=["serial_no"])
-		for nos in serial_nos:
-			creation = frappe.db.get_value("Serial No", nos["serial_no"], "purchase_document_no")
-			if creation:
-				related[creation] = related.get(creation, 0) + 1
+		serials = frappe.db.sql("""
+			SELECT sn.purchase_document_no
+			FROM `tabSerial and Batch Entry` sbe
+			LEFT JOIN `tabSerial No` sn ON sn.name = sbe.serial_no
+			WHERE sbe.parent = %s AND sn.purchase_document_no IS NOT NULL
+		""", (bundle,), as_dict=True)
+
+		for row in serials:
+			related[row.purchase_document_no] = related.get(row.purchase_document_no, 0) + 1
+
 		return related
 
 
