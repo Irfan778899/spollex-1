@@ -192,7 +192,7 @@ frappe.query_reports["Accounts Receivable for Sales User"] = {
 	},
 };
 
-erpnext.utils.add_dimensions("Accounts Receivable", 9);
+erpnext.utils.add_dimensions("Accounts Receivable for Sales User", 9);
 
 function get_party_type_options() {
 	let options = [];

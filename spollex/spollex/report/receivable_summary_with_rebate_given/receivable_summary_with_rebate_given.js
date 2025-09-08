@@ -135,7 +135,7 @@ frappe.query_reports["Receivable Summary with Rebate Given"] = {
 	},
 };
 
-erpnext.utils.add_dimensions("Accounts Receivable Summary", 9);
+erpnext.utils.add_dimensions("Receivable Summary with Rebate Given", 9);
 
 function get_party_type_options() {
 	let options = [];

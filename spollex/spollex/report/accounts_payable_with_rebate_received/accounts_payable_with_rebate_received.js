@@ -163,7 +163,7 @@ frappe.query_reports["Accounts Payable with Rebate Received"] = {
 	},
 };
 
-erpnext.utils.add_dimensions("Accounts Payable", 9);
+erpnext.utils.add_dimensions("Accounts Payable with Rebate Received", 9);
 
 function get_party_type_options() {
 	let options = [];

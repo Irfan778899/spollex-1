@@ -107,7 +107,7 @@ frappe.query_reports["Payable Summary with Rebate Received"] = {
 	},
 };
 
-erpnext.utils.add_dimensions("Accounts Payable Summary", 9);
+erpnext.utils.add_dimensions("Payable Summary with Rebate Received", 9);
 
 function get_party_type_options() {
 	let options = [];
