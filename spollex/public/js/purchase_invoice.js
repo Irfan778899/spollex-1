@@ -21,6 +21,11 @@ let post_purchase_debit_note = async function(frm) {
             fieldname: 'posting_date',
             fieldtype: 'Date',
             default: frm.doc.posting_date
+        },
+        {
+            label: 'Remark',
+            fieldname: 'remark',
+            fieldtype: 'Small Text',
         }
     ];
 
@@ -35,6 +40,7 @@ let post_purchase_debit_note = async function(frm) {
                     args: {
                         rebate_amount : values.rebate_amount,
                         posting_date : values.posting_date,
+                        remark: values.remark,
                         reference_name: frm.doc.name,
                     },
                     callback: function(response) {

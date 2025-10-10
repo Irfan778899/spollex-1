@@ -6,7 +6,7 @@ from frappe.utils import nowdate, add_days, formatdate
 from frappe import _
 
 @frappe.whitelist()
-def create_credit_note(rebate_amount, posting_date, reference_name):
+def create_credit_note(rebate_amount, posting_date, remark, reference_name):
     sales_invoice = frappe.get_doc("Sales Invoice", reference_name)
     company = sales_invoice.get("company")
 
@@ -22,6 +22,7 @@ def create_credit_note(rebate_amount, posting_date, reference_name):
 
     journal_entry.voucher_type = "Credit Note"
     journal_entry.posting_date = posting_date
+    journal_entry.user_remark = remark
 
     credit_account = frappe.get_cached_value("Company", company, "default_receivable_account")
 
@@ -96,7 +97,7 @@ def create_credit_note(rebate_amount, posting_date, reference_name):
     return journal_entry
 
 @frappe.whitelist()
-def create_debit_note(rebate_amount, posting_date, reference_name):
+def create_debit_note(rebate_amount, posting_date, remark, reference_name):
     purchase_invoice = frappe.get_doc("Purchase Invoice", reference_name)
     company = purchase_invoice.get("company")
 
@@ -112,6 +113,7 @@ def create_debit_note(rebate_amount, posting_date, reference_name):
 
     journal_entry.voucher_type = "Debit Note"
     journal_entry.posting_date = posting_date
+    journal_entry.user_remark = remark
 
     debit_account = frappe.get_cached_value("Company", company, "default_payable_account")
 
