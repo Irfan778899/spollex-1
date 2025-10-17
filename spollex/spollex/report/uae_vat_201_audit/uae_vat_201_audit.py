@@ -146,7 +146,12 @@ def get_standard_rated_sales(filters):
 				'Customer' as party_type,
 				s.customer as party,
 				SUM(i.base_net_amount) as taxable_amount,
-				SUM(i.tax_amount) as vat_amount,
+				SUM(
+					CASE
+						WHEN s.currency = 'AED' THEN i.tax_amount
+						ELSE (i.base_net_amount * (i.tax_rate / 100))
+					END
+				) as vat_amount,
 				CONCAT('Standard rated supplies in ', s.vat_emirate) as legend,
 				%(row_no)s as row_no
 			FROM 
@@ -219,7 +224,7 @@ def get_zero_rated_sales(filters):
 			s.name as voucher_no,
 			'Customer' as party_type,
 			s.customer as party,
-			i.base_net_amount as taxable_amount,
+			SUM(i.base_net_amount) as taxable_amount,
 			0 as vat_amount,
 			'Zero Rated' as legend,
 			'4' as row_no
@@ -233,6 +238,7 @@ def get_zero_rated_sales(filters):
 			AND (i.is_zero_rated = 1 OR i.tax_amount = 0)
 			AND i.is_exempt != 1
 			{conditions}
+		GROUP BY s.name
 	""".format(conditions=conditions), filters, as_dict=1)
 
 def get_exempt_sales(filters):
@@ -245,7 +251,7 @@ def get_exempt_sales(filters):
 			s.name as voucher_no,
 			'Customer' as party_type,
 			s.customer as party,
-			i.base_net_amount as taxable_amount,
+			SUM(i.base_net_amount) as taxable_amount,
 			0 as vat_amount,
 			'Exempt Supplies' as legend,
 			'5' as row_no
@@ -258,6 +264,7 @@ def get_exempt_sales(filters):
 			AND i.is_exempt = 1
 			AND i.is_zero_rated != 1
 			{conditions}
+		GROUP BY s.name
 	""".format(conditions=conditions), filters, as_dict=1)
 
 def get_imported_goods(filters):
