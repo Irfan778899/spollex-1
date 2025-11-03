@@ -52,14 +52,26 @@ def execute(filters=None):
 
 	filters.company_abbr = frappe.get_cached_value("Company", filters.company, "abbr")
 
+	direct_income_root = f"Direct Income - {filters.company_abbr}"
+	indirect_income_root = f"Indirect Income - {filters.company_abbr}"
 	direct_account_root = f"Direct Expenses - {filters.company_abbr}"
 	indirect_account_root = f"Indirect Expenses - {filters.company_abbr}"
 
+	direct_income_accounts = get_descendants_of("Account", direct_income_root)
+	indirect_income_accounts = get_descendants_of("Account", indirect_income_root)
 	direct_expense_accounts = get_descendants_of("Account", direct_account_root)
 	indirect_expense_accounts = get_descendants_of("Account", indirect_account_root)
 
-	direct_expense = []
-	indirect_expense = []
+	direct_income, indirect_income, direct_expense, indirect_expense = [], [], [], []
+
+	for row in income:
+		account = row.get("account")
+		if not account:
+			continue
+		if account in direct_income_accounts or account == direct_income_root:
+			direct_income.append(row)
+		elif account in indirect_income_accounts or account == indirect_income_root:
+			indirect_income.append(row)
 
 	for row in expense:
 		account = row.get("account")
@@ -70,8 +82,10 @@ def execute(filters=None):
 		elif account in indirect_expense_accounts or account == indirect_account_root:
 			indirect_expense.append(row)
 
-	reset_indent_tree(direct_expense, direct_account_root)
-	reset_indent_tree(indirect_expense, indirect_account_root)
+	reset_indent_tree(direct_income, direct_income_root, filters.company_abbr)
+	reset_indent_tree(indirect_income, indirect_income_root, filters.company_abbr)
+	reset_indent_tree(direct_expense, direct_account_root, filters.company_abbr)
+	reset_indent_tree(indirect_expense, indirect_account_root, filters.company_abbr)
 
 	gross_profit_loss = get_gross_profit_loss(
 		income, direct_expense, period_list, filters.company, filters.presentation_currency
@@ -82,7 +96,13 @@ def execute(filters=None):
 	)
 
 	data = []
-	data.extend(income or [])
+	data.extend(direct_income or [])
+	data.extend(indirect_income or [])
+	for row in income or []:
+		if row.get("account") == "'Total Income (Credit)'":
+			data.append(row)
+			break
+	data.append({})
 	data.extend(direct_expense or [])
 	if gross_profit_loss:
 		data.append(gross_profit_loss)
@@ -112,6 +132,38 @@ def execute(filters=None):
 
 	if filters.get("selected_view") == "Margin":
 		compute_margin_view_data(data, period_list, filters.accumulated_values)
+
+	if filters.periodicity == "Yearly":
+		# Add a separate "Total" column
+		columns.append({
+			"label": _("Total"),
+			"fieldname": "total",
+			"fieldtype": "Currency",
+			"width": 150
+		})
+
+		for row in data:
+			if not isinstance(row, dict):
+				continue
+
+			total_value = 0.0
+
+			# Sum across all period columns
+			for period in period_list:
+				key = period.key
+				if key in row:
+					total_value += flt(row[key])
+			if (row.get("is_group") and row.get("indent", 0) == 0) or row.get("account_name") in ("'Total Income (Credit)'", "'Total Expense (Debit)'",
+ "'Gross Profit'", "'Net Profit'"):
+				# clear yearly column values
+				for period in period_list:
+					key = period.key
+					if key in row:
+						row[key] = None
+				# set total only for group accounts
+				row["total"] = total_value
+			else:
+				row["total"] = None
 
 	return columns, data, None, chart, report_summary, primitive_summary
 
@@ -290,14 +342,14 @@ def get_chart_data(filters, columns, income, direct_expense, gross_profit_loss, 
 	return chart
 
 
-def reset_indent_tree(expense_rows, root_account_name):
+def reset_indent_tree(income_expense_rows, root_account_name, company_abbr):
 	from collections import defaultdict
 
 	# Build account lookup and parent-child map
 	account_map = {}
 	child_map = defaultdict(list)
 
-	for row in expense_rows:
+	for row in income_expense_rows:
 		account = row.get("account")
 		parent = row.get("parent_account")
 		if account:
@@ -305,14 +357,25 @@ def reset_indent_tree(expense_rows, root_account_name):
 		if parent:
 			child_map[parent].append(account)
 
+	ordered_rows = []
 	# Recursive function to set indent
 	def set_indent(account, indent_level):
 		row = account_map.get(account)
 		if row:
 			row["indent"] = indent_level
-			for child in child_map.get(account, []):
+			ordered_rows.append(row)
+
+			children = child_map.get(account, [])
+
+			if account == f"Direct Income - {company_abbr}":
+
+				children = sorted(children, key=lambda x: (x != f"Sales - {company_abbr}", x.lower()))
+
+			for child in children:
 				set_indent(child, indent_level + 1)
 
 	set_indent(root_account_name, 0)
+
+	income_expense_rows[:] = ordered_rows
 
 
