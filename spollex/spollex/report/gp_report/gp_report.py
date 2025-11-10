@@ -843,7 +843,7 @@ class GrossProfitGenerator:
 			if warehouse_details:
 				conditions += f" and `tabSales Invoice Item`.warehouse in (select name from `tabWarehouse` wh where wh.lft >= {warehouse_details.lft} and wh.rgt <= {warehouse_details.rgt} and warehouse = wh.name)"
 
-		rebate_account = frappe.get_cached_value("Account", {"account_name": "Rebate Given"}, "name")
+		rebate_account = frappe.get_cached_value("Account", {"account_name": "Credit Notes (Rebate Given)"}, "name")
 
 		self.si_list = frappe.db.sql(
 			"""
@@ -981,7 +981,7 @@ class GrossProfitGenerator:
 	def get_invoice_row(self, row, filters):
 		# header row format
 
-		rebate_account = frappe.get_cached_value("Account", {"account_name": "Rebate Given"}, "name")
+		rebate_account = frappe.get_cached_value("Account", {"account_name": "Credit Notes (Rebate Given)"}, "name")
 
 		credit_note_total = frappe.db.sql(
 			"""
