@@ -277,8 +277,17 @@ def get_imported_goods(filters):
 			name as voucher_no,
 			'Supplier' as party_type,
 			supplier as party,
-			base_net_total as taxable_amount,
-			(base_net_total * recoverable_reverse_charge / 100) * 0.05 as vat_amount,
+			CASE
+				WHEN custom_is_dubai_customs = 1 THEN custom_taxable_value
+				ELSE base_net_total
+			END AS taxable_amount,
+			(
+				CASE
+					WHEN custom_is_dubai_customs = 1 THEN custom_taxable_value
+					ELSE base_net_total
+				END
+				* recoverable_reverse_charge / 100
+			) * 0.05 as vat_amount,
 			'Goods imported into UAE' as legend,
 			'6' as row_no
 		FROM 
@@ -322,8 +331,17 @@ def get_reverse_charge_purchases(filters):
 			name as voucher_no,
 			'Supplier' as party_type,
 			supplier as party,
-			base_net_total as taxable_amount,
-			(base_net_total * recoverable_reverse_charge / 100) * 0.05 as vat_amount,
+			CASE
+				WHEN custom_is_dubai_customs = 1 THEN custom_taxable_value
+				ELSE base_net_total
+			END AS taxable_amount,
+			(
+				CASE
+					WHEN custom_is_dubai_customs = 1 THEN custom_taxable_value
+					ELSE base_net_total
+				END
+				* recoverable_reverse_charge / 100
+			) * 0.05 as vat_amount,
 			'Supplies subject to the reverse charge provision' as legend,
 			'10' as row_no
 		FROM 

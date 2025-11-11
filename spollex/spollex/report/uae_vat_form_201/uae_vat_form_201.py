@@ -264,7 +264,10 @@ def get_reverse_charge_recoverable_total(filters):
 	try:
 		return (
 			frappe.db.get_all(
-				"Purchase Invoice", filters=query_filters, fields=["sum(base_net_total)"], as_list=True, limit=1
+				"Purchase Invoice",
+				filters=query_filters,
+				fields=["sum(IF(custom_is_dubai_customs = 1, custom_taxable_value, base_net_total))"],
+				as_list=True, limit=1
 			)[0][0]
 			or 0
 		)
@@ -279,7 +282,13 @@ def get_reverse_charge_recoverable_tax(filters):
         frappe.db.sql(
             f"""
             SELECT 
-                SUM((p.base_net_total * p.recoverable_reverse_charge / 100) * 0.05)
+				SUM((
+					CASE
+						WHEN p.custom_is_dubai_customs = 1 THEN p.custom_taxable_value
+						ELSE p.base_net_total
+					END
+					* p.recoverable_reverse_charge / 100
+					) * 0.05)
             FROM 
                 `tabPurchase Invoice` p
             WHERE 
