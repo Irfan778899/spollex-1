@@ -69,7 +69,7 @@ def get_data(filters):
 	data.extend(get_tourist_tax_returns(filters))
 	
 	# Get reverse charge supplies (Row 3)
-#	data.extend(get_reverse_charge_supplies(filters))
+	data.extend(get_zero_rated_purchases(filters))
 	
 	# Get zero rated supplies (Row 4)
 	data.extend(get_zero_rated_sales(filters))
@@ -214,6 +214,34 @@ def get_tourist_tax_returns(filters):
 #			{conditions}
 #	""".format(conditions=conditions), filters, as_dict=1)
 
+def get_zero_rated_purchases(filters):
+	"""Returns the sum of the total of each Purchase invoice made which is zero rated."""
+	conditions = get_conditions(filters)
+	return (
+		frappe.db.sql("""
+			SELECT
+				posting_date,
+				'Purchase Invoice' as voucher_type,
+				name as voucher_no,
+				'Supplier' as party_type,
+				supplier as party,
+				CASE
+					WHEN custom_is_dubai_customs = 1 THEN custom_taxable_value
+					ELSE base_net_total
+				END as taxable_amount,
+				0 as vat_amount,
+				'Supplies subject to the reverse charge provision' as legend,
+				'3' as row_no
+			FROM
+				`tabPurchase Invoice`
+			WHERE
+				reverse_charge = "N"
+				AND docstatus = 1
+				AND recoverable_standard_rated_expenses = 0
+				{conditions};
+		""".format(conditions=conditions), filters, as_dict=1)
+	)
+
 def get_zero_rated_sales(filters):
 	conditions = get_conditions(filters)
 	
@@ -234,7 +262,8 @@ def get_zero_rated_sales(filters):
 		WHERE 
 			s.docstatus = 1
 			AND s.is_opening = 'No'
-			AND s.taxes_and_charges NOT LIKE 'UAE VAT 5%%'
+			AND s.taxes_and_charges NOT LIKE "VAT 5%%"
+			AND s.taxes_and_charges NOT LIKE "Out Of Scope%%"
 			AND (i.is_zero_rated = 1 OR i.tax_amount = 0)
 			AND i.is_exempt != 1
 			{conditions}

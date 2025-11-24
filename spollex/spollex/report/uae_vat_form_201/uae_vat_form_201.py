@@ -62,7 +62,7 @@ def append_vat_on_sales(data, filters):
 		frappe.format((-1) * get_tourist_tax_return_tax(filters), "Currency"),
 	)
 
-	append_data(data, "3", _("Supplies subject to the reverse charge provision"), "-", "-")
+	append_data(data, "3", _("Supplies subject to the reverse charge provision"), frappe.format(get_zero_rated_purchases(filters), "Currency"), "-")
 
 	append_data(data, "4", _("Zero Rated"), frappe.format(get_zero_rated_total(filters), "Currency"), "-")
 
@@ -257,22 +257,29 @@ def get_reverse_charge_tax(filters):
 
 def get_reverse_charge_recoverable_total(filters):
 	"""Returns the sum of the total of each Purchase invoice made with recoverable reverse charge."""
-	query_filters = get_filters(filters)
-	query_filters.append(["reverse_charge", "=", "Y"])
-	query_filters.append(["recoverable_reverse_charge", ">", "0"])
-	query_filters.append(["docstatus", "=", 1])
-	try:
-		return (
-			frappe.db.get_all(
-				"Purchase Invoice",
-				filters=query_filters,
-				fields=["sum(IF(custom_is_dubai_customs = 1, custom_taxable_value, base_net_total))"],
-				as_list=True, limit=1
-			)[0][0]
-			or 0
-		)
-	except (IndexError, TypeError):
-		return 0
+	condition = get_conditions_join(filters)
+	return (
+		frappe.db.sql(
+			f"""
+			SELECT
+				SUM(
+					CASE
+						WHEN p.custom_is_dubai_customs = 1 THEN p.custom_taxable_value
+						ELSE p.base_net_total
+					END
+					)
+			FROM
+				`tabPurchase Invoice` p
+			WHERE
+				p.reverse_charge = "Y"
+				AND p.docstatus = 1
+				AND p.recoverable_reverse_charge > 0
+				{condition};
+			""",
+			filters,
+		)[0][0]
+		or 0
+	)
 
 
 def get_reverse_charge_recoverable_tax(filters):
@@ -409,6 +416,33 @@ def get_tourist_tax_return_tax(filters):
 		return 0
 
 
+def get_zero_rated_purchases(filters):
+	"""Returns the sum of the total of each Purchase invoice made which is zero rated."""
+	condition = get_conditions_join(filters)
+	return (
+		frappe.db.sql(
+			f"""
+			SELECT
+				SUM(
+					CASE
+						WHEN p.custom_is_dubai_customs = 1 THEN p.custom_taxable_value
+						ELSE p.base_net_total
+					END
+					)
+			FROM
+				`tabPurchase Invoice` p
+			WHERE
+				p.reverse_charge = "N"
+				AND p.docstatus = 1
+				AND p.recoverable_standard_rated_expenses = 0
+				{condition};
+			""",
+			filters,
+		)[0][0]
+		or 0
+	)
+
+
 def get_zero_rated_total(filters):
 	"""Returns the sum of each Sales Invoice Item Amount which is zero rated."""
 	conditions = get_conditions(filters)
@@ -425,7 +459,8 @@ def get_zero_rated_total(filters):
 			where
 				s.docstatus = 1 and
 				s.is_opening = "No" and
-				(i.is_zero_rated = 1 or i.tax_amount = 0) and i.is_exempt != 1
+				(i.is_zero_rated = 1 or i.tax_amount = 0) and i.is_exempt != 1 and
+				s.taxes_and_charges NOT LIKE "Out Of Scope%%"
 				{conditions} ;
 			""",
 				filters,
