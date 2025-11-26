@@ -460,7 +460,8 @@ def get_zero_rated_total(filters):
 				s.docstatus = 1 and
 				s.is_opening = "No" and
 				(i.is_zero_rated = 1 or i.tax_amount = 0) and i.is_exempt != 1 and
-				s.taxes_and_charges NOT LIKE "Out Of Scope%%"
+				s.taxes_and_charges NOT LIKE "%%UAE VAT 5%%" and
+				s.taxes_and_charges NOT LIKE "%%UAE Out Of Scope%%"
 				{conditions} ;
 			""",
 				filters,

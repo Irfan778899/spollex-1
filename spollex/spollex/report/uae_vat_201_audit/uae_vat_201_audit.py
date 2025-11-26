@@ -262,8 +262,8 @@ def get_zero_rated_sales(filters):
 		WHERE 
 			s.docstatus = 1
 			AND s.is_opening = 'No'
-			AND s.taxes_and_charges NOT LIKE "VAT 5%%"
-			AND s.taxes_and_charges NOT LIKE "Out Of Scope%%"
+			AND s.taxes_and_charges NOT LIKE "%%UAE VAT 5%%"
+			AND s.taxes_and_charges NOT LIKE "%%UAE Out Of Scope%%"
 			AND (i.is_zero_rated = 1 OR i.tax_amount = 0)
 			AND i.is_exempt != 1
 			{conditions}
