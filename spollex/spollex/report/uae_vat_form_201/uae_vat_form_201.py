@@ -38,6 +38,16 @@ def get_data(filters=None):
 	"""Returns the list of dictionaries. Each dictionary is a row in the datatable and chart data."""
 	data = []
 	global total_sales_vat_amount, total_purchase_vat_amount
+	global reverse_purchase_amount, reverse_purchase_tax
+
+	standard_rated_reverse_purchase_amount = get_reverse_charge_recoverable_total(filters)
+	standard_rated_reverse_purchase_tax_amount = get_reverse_charge_recoverable_tax(filters)
+	standard_rated_material_transfer_amount = get_material_transfer_total_for_dubai_customs(filters)
+	standard_rated_material_transfer_tax_amount = standard_rated_material_transfer_amount * 0.05
+
+	reverse_purchase_amount = standard_rated_reverse_purchase_amount + standard_rated_material_transfer_amount
+	reverse_purchase_tax = standard_rated_reverse_purchase_tax_amount + standard_rated_material_transfer_tax_amount
+
 	emirates, amounts_by_emirate = append_vat_on_sales(data, filters)
 	append_vat_on_expenses(data, filters)
 	append_data(data, "", "", "", "")
@@ -72,8 +82,8 @@ def append_vat_on_sales(data, filters):
 		data,
 		"6",
 		_("Goods imported into UAE"),
-		frappe.format(get_reverse_charge_recoverable_total(filters), "Currency"),
-		frappe.format(get_reverse_charge_recoverable_tax(filters), "Currency"),
+		frappe.format(reverse_purchase_amount, "Currency"),
+		frappe.format(reverse_purchase_tax, "Currency"),
 	)
 
 	append_data(data, "7", _("Adjustments to goods imported into UAE"), "-", "-")
@@ -133,8 +143,6 @@ def append_vat_on_expenses(data, filters):
 	total_taxable_amount, total_vat = get_vat_debit_totals(filters)
 	standard_rated_purchase_amount = get_standard_rated_expenses_total(filters)
 	standard_rated_purchase_tax_amount = get_standard_rated_expenses_tax(filters)
-	standard_rated_reverse_purchase_amount = get_reverse_charge_recoverable_total(filters)
-	standard_rated_reverse_purchase_tax_amount = get_reverse_charge_recoverable_tax(filters)
 	append_data(
 		data,
 		"9",
@@ -146,14 +154,14 @@ def append_vat_on_expenses(data, filters):
 		data,
 		"10",
 		_("Supplies subject to the reverse charge provision"),
-		frappe.format(standard_rated_reverse_purchase_amount, "Currency"),
-		frappe.format(standard_rated_reverse_purchase_tax_amount, "Currency"),
+		frappe.format(reverse_purchase_amount, "Currency"),
+		frappe.format(reverse_purchase_tax, "Currency"),
 	)
 
 	global total_purchase_amount, total_purchase_vat_amount
 	total_purchase_amount = total_purchase_vat_amount = 0
-	total_purchase_amount = standard_rated_purchase_amount - total_debit_amount + total_taxable_amount + standard_rated_reverse_purchase_amount
-	total_purchase_vat_amount = standard_rated_purchase_tax_amount - total_debit_vat + total_vat + standard_rated_reverse_purchase_tax_amount
+	total_purchase_amount = standard_rated_purchase_amount - total_debit_amount + total_taxable_amount + reverse_purchase_amount
+	total_purchase_vat_amount = standard_rated_purchase_tax_amount - total_debit_vat + total_vat + reverse_purchase_tax
 	append_data(data, "11", _("Totals"), frappe.format(total_purchase_amount, "Currency"), frappe.format(total_purchase_vat_amount, "Currency"))
 
 
@@ -330,6 +338,33 @@ def get_reverse_charge_recoverable_tax(filters):
 	# 	or 0
 	# )
 
+
+def get_material_transfer_total_for_dubai_customs(filters):
+	"""Returns the sum of the total of each Stock Entry having Dubai Customs."""
+	condition = get_conditions_join_se(filters)
+	return (
+		frappe.db.sql(
+			f"""
+			SELECT
+				SUM(
+					CASE
+						WHEN se.custom_is_dubai_customs = 1 THEN se.custom_taxable_value
+					END
+					)
+			FROM
+				`tabStock Entry` se
+			WHERE
+				se.stock_entry_type = "Material Transfer"
+				AND se.docstatus = 1
+				{condition};
+			""",
+			filters,
+		)[0][0]
+		or 0
+	)
+
+def get_conditions_join_se(filters):
+	return get_conditions_join(filters).replace("p.", "se.")
 
 def get_conditions_join(filters):
 	"""The conditions to be used to filter data to calculate the total vat."""

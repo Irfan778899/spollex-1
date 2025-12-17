@@ -79,12 +79,14 @@ def get_data(filters):
 	
 	# Get imported goods (Row 6)
 	data.extend(get_imported_goods(filters))
+	data.extend(get_material_transfers_for_dubai_customs(filters, row_no="6", legend="Goods imported into UAE"))
 	
 	# Get standard rated expenses (Row 9)
 	data.extend(get_standard_rated_purchases(filters))
 	
 	# Get reverse charge purchases (Row 10)
 	data.extend(get_reverse_charge_purchases(filters))
+	data.extend(get_material_transfers_for_dubai_customs(filters, row_no="10", legend="Supplies subject to the reverse charge provision"))
 
 	data.extend(get_credit_note_entries(filters))   # Row 1h
 	data.extend(get_debit_note_entries(filters))    # Row 9 addition
@@ -328,9 +330,34 @@ def get_imported_goods(filters):
 			{conditions}
 	""".format(conditions=conditions), filters, as_dict=1)
 
+
+def get_material_transfers_for_dubai_customs(filters, legend, row_no):
+	conditions = get_conditions(filters)
+
+	return frappe.db.sql("""
+		SELECT
+			se.posting_date,
+			'Stock Entry' AS voucher_type,
+			se.name AS voucher_no,
+			NULL AS party_type,
+			NULL AS party,
+			se.custom_taxable_value AS taxable_amount,
+			(se.custom_taxable_value * 0.05) AS vat_amount,
+			%(legend)s AS legend,
+			%(row_no)s AS row_no
+		FROM
+			`tabStock Entry` se
+		WHERE
+			se.docstatus = 1
+			AND se.stock_entry_type = 'Material Transfer'
+			AND se.custom_is_dubai_customs = 1
+			{conditions}
+	""".format(conditions=conditions), { **filters, "legend": legend, "row_no": row_no } , as_dict=1)
+
+
 def get_standard_rated_purchases(filters):
 	conditions = get_conditions(filters)
-	
+
 	return frappe.db.sql("""
 		SELECT 
 			posting_date,
@@ -349,6 +376,7 @@ def get_standard_rated_purchases(filters):
 			AND recoverable_standard_rated_expenses != 0
 			{conditions}
 	""".format(conditions=conditions), filters, as_dict=1)
+
 
 def get_reverse_charge_purchases(filters):
 	conditions = get_conditions(filters)
@@ -382,6 +410,7 @@ def get_reverse_charge_purchases(filters):
 			{conditions}
 	""".format(conditions=conditions), filters, as_dict=1)
 
+
 def get_conditions(filters):
 	conditions = ""
 	for opts in (
@@ -392,6 +421,7 @@ def get_conditions(filters):
 		if filters.get(opts[0]):
 			conditions += opts[1]
 	return conditions
+
 
 def get_credit_note_entries(filters):
 	"""Include only Credit Notes with VAT, under emirate category (Row 1a–1g)."""
@@ -560,6 +590,7 @@ def get_debit_note_entries(filters):
 		})
 
 	return entries
+
 
 def get_journal_entry_input_vat(filters):
 	"""Row 9 – Add Journal Entries with Input VAT as standard-rated expenses."""
