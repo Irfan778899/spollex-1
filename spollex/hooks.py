@@ -55,7 +55,9 @@ app_include_js = "spollex.bundle.js"
 doctype_js = {
     "Sales Invoice" : "public/js/sales_invoice.js",
     "Purchase Invoice" : "public/js/purchase_invoice.js",
-    "Purchase Order" : "public/js/purchase_order.js"
+    "Purchase Order" : "public/js/purchase_order.js",
+    "Contract" : "public/js/contract.js",
+    "Maintenance Visit" : "public/js/maintenance_visit.js"
     }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -174,6 +176,10 @@ doc_events = {
 			"erpnext.regional.united_arab_emirates.utils.update_grand_total_for_rcm",
 			"erpnext.regional.united_arab_emirates.utils.validate_returns",
 		]
+	},
+	"Maintenance Visit": {
+		"on_submit": "spollex.doctype_events.maintenance_visit.update_contract_visits",
+        "on_cancel": "spollex.doctype_events.maintenance_visit.revert_contract_visits"
 	}
 }
 
