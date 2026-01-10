@@ -390,3 +390,26 @@ def show_payments_popup():
         )
     else:
         frappe.msgprint("No Payments/Receipts due in the next 7 days.", title="No Pending Invoices", indicator="green")
+
+@frappe.whitelist()
+def add_additional_visits_to_contract(contract_name, visit_type, additional_visits):
+    contract = frappe.get_doc("Contract", contract_name)
+    visit_found = False
+    for visit in contract.custom_contract_visit_details:
+        if visit.visit_type == visit_type:
+            visit_found = True
+            frappe.db.set_value(
+                "Contract Visit Detail",
+                visit.name,
+                {
+                    "total_visits": visit.total_visits + int(additional_visits),
+                    "balance_visits": visit.balance_visits + int(additional_visits)
+                }
+            )
+            contract.reload()
+            break
+    
+    if not visit_found:
+        frappe.throw(_("Visit Type {0} not found in Contract {1}").format(visit_type, contract_name))
+
+    return

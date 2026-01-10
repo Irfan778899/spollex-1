@@ -1,0 +1,58 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-01-10 11:11:15.540096",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "visit_type",
+  "total_visits",
+  "completed_visits",
+  "balance_visits"
+ ],
+ "fields": [
+  {
+   "fieldname": "visit_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Visit Type",
+   "options": "Visit Type"
+  },
+  {
+   "fieldname": "total_visits",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Total Visits"
+  },
+  {
+   "fieldname": "completed_visits",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Completed Visits",
+   "read_only": 1
+  },
+  {
+   "fieldname": "balance_visits",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Balance Visits",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-01-10 11:12:46.719362",
+ "modified_by": "Administrator",
+ "module": "spollex",
+ "name": "Contract Visit Detail",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
