@@ -706,43 +706,48 @@ class GrossProfitGenerator:
 		# IMP NOTE
 		# stock_ledger_entries should already be filtered by item_code and warehouse and
 		# sorted by posting_date desc, posting_time desc
-		if item_code in self.non_stock_items and (row.project or row.cost_center):
-			# Issue 6089-Get last purchasing rate for non-stock item
-			item_rate = self.get_last_purchase_rate(item_code, row)
-			return flt(row.qty) * item_rate
-
+		if item_code in ("services", "Data Network Point", "Data Network Point 2"):
+			return 0.0
+		elif item_code == "Data Network Point - Service":
+			return flt(row.custom_dnp_expense_total)
 		else:
-			my_sle = self.get_stock_ledger_entries(item_code, row.warehouse)
-			if (row.update_stock or row.dn_detail) and my_sle:
-				parenttype, parent = row.parenttype, row.parent
-				if row.dn_detail:
-					parenttype, parent = "Delivery Note", row.delivery_note
-					
-				return self.calculate_buying_amount_from_sle(
-					row, my_sle, parenttype, parent, row.item_row, item_code
-				)
-			elif self.delivery_notes.get((row.parent, row.item_code), None):
-				#  check if Invoice has delivery notes
-				dn = self.delivery_notes.get((row.parent, row.item_code))
-				parenttype, parent, item_row, dn_warehouse = (
-					"Delivery Note",
-					dn["delivery_note"],
-					dn["item_row"],
-					dn["warehouse"],
-				)
-				my_sle = self.get_stock_ledger_entries(item_code, dn_warehouse)
-				return self.calculate_buying_amount_from_sle(
-					row, my_sle, parenttype, parent, item_row, item_code
-				)
-			elif row.sales_order and row.so_detail:
-				incoming_amount = self.get_buying_amount_from_so_dn(row.sales_order, row.so_detail, item_code)
+			if item_code in self.non_stock_items and (row.project or row.cost_center):
+				# Issue 6089-Get last purchasing rate for non-stock item
+				item_rate = self.get_last_purchase_rate(item_code, row)
+				return flt(row.qty) * item_rate
 
-				if incoming_amount:
-					return flt(row.qty) * incoming_amount
 			else:
-				return flt(row.qty) * self.get_average_buying_rate(row, item_code)
+				my_sle = self.get_stock_ledger_entries(item_code, row.warehouse)
+				if (row.update_stock or row.dn_detail) and my_sle:
+					parenttype, parent = row.parenttype, row.parent
+					if row.dn_detail:
+						parenttype, parent = "Delivery Note", row.delivery_note
 
-		return flt(row.qty) * self.get_average_buying_rate(row, item_code)
+					return self.calculate_buying_amount_from_sle(
+						row, my_sle, parenttype, parent, row.item_row, item_code
+					)
+				elif self.delivery_notes.get((row.parent, row.item_code), None):
+					#  check if Invoice has delivery notes
+					dn = self.delivery_notes.get((row.parent, row.item_code))
+					parenttype, parent, item_row, dn_warehouse = (
+						"Delivery Note",
+						dn["delivery_note"],
+						dn["item_row"],
+						dn["warehouse"],
+					)
+					my_sle = self.get_stock_ledger_entries(item_code, dn_warehouse)
+					return self.calculate_buying_amount_from_sle(
+						row, my_sle, parenttype, parent, item_row, item_code
+					)
+				elif row.sales_order and row.so_detail:
+					incoming_amount = self.get_buying_amount_from_so_dn(row.sales_order, row.so_detail, item_code)
+
+					if incoming_amount:
+						return flt(row.qty) * incoming_amount
+				else:
+					return flt(row.qty) * self.get_average_buying_rate(row, item_code)
+
+			return flt(row.qty) * self.get_average_buying_rate(row, item_code)
 
 	def get_buying_amount_from_so_dn(self, sales_order, so_detail, item_code):
 		from frappe.query_builder.functions import Avg
@@ -847,6 +852,11 @@ class GrossProfitGenerator:
 				conditions += f" and `tabSales Invoice Item`.warehouse in (select name from `tabWarehouse` wh where wh.lft >= {warehouse_details.lft} and wh.rgt <= {warehouse_details.rgt} and warehouse = wh.name)"
 
 		rebate_account = frappe.get_cached_value("Account", {"account_name": "Credit Notes (Rebate Given)"}, "name")
+		custom_dnp_expense_field = (
+			"`tabSales Invoice`.custom_dnp_expense_total as custom_dnp_expense_total,"
+			if frappe.db.has_column("Sales Invoice", "custom_dnp_expense_total")
+			else "0 as custom_dnp_expense_total,"
+		)
 
 		self.si_list = frappe.db.sql(
 			"""
@@ -859,7 +869,7 @@ class GrossProfitGenerator:
 				`tabSales Invoice`.base_net_total as "invoice_base_net_total",
 				`tabSales Invoice Item`.item_name, `tabSales Invoice Item`.description,
 				`tabSales Invoice Item`.warehouse, `tabSales Invoice Item`.item_group,
-				`tabSales Partner Details`.sales_partner_name,
+				`tabSales Partner Details`.sales_partner_name, {custom_dnp_expense_field}
 				`tabSales Invoice Item`.brand, `tabSales Invoice Item`.so_detail,
 				`tabSales Invoice Item`.sales_order, `tabSales Invoice Item`.dn_detail,
 				`tabSales Invoice Item`.delivery_note, `tabSales Invoice Item`.stock_qty as qty,
@@ -915,6 +925,7 @@ class GrossProfitGenerator:
 				conditions=conditions,
 				match_cond=get_match_cond("Sales Invoice"),
 				rebate_account=rebate_account,
+				custom_dnp_expense_field=custom_dnp_expense_field,
 			),
 			self.filters,
 			as_dict=1,
