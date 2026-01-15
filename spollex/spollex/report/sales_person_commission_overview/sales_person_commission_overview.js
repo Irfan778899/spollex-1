@@ -1,16 +1,16 @@
 // Copyright (c) 2024, 4C Solutions and contributors
 // For license information, please see license.txt
 
-frappe.query_reports["Spollex Sales Partner Commission Summary"] = {
+frappe.query_reports["Sales Person Commission Overview"] = {
 	"filters": [
 		{
-			fieldname: "sales_partner",
-			label: __("Sales Partner"),
+			fieldname: "sales_person",
+			label: __("Sales Person"),
 			fieldtype: "Link",
-			options: "Sales Partner",
+			options: "Sales Person",
 		},
 		{
-			fieldname: "doctype",
+			fieldname: "doc_type",
 			label: __("Document Type"),
 			fieldtype: "Select",
 			options: "Sales Order\nDelivery Note\nSales Invoice",
@@ -20,7 +20,7 @@ frappe.query_reports["Spollex Sales Partner Commission Summary"] = {
 			fieldname: "from_date",
 			label: __("From Date"),
 			fieldtype: "Date",
-			default: frappe.datetime.add_months(frappe.datetime.get_today(), -1),
+			default: erpnext.utils.get_fiscal_year(frappe.datetime.get_today(), true)[1],
 		},
 		{
 			fieldname: "to_date",
