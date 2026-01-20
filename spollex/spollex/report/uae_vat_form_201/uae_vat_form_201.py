@@ -263,19 +263,28 @@ def get_reverse_charge_tax(filters):
 	)
 
 
+def get_pi_total():
+	if frappe.db.has_column("Purchase Invoice", "custom_is_dubai_customs") and frappe.db.has_column(
+		"Purchase Invoice", "custom_taxable_value"
+	):
+		return """
+			CASE
+				WHEN p.custom_is_dubai_customs = 1 THEN p.custom_taxable_value
+				ELSE p.base_net_total
+			END
+		"""
+	return "p.base_net_total"
+
+
 def get_reverse_charge_recoverable_total(filters):
 	"""Returns the sum of the total of each Purchase invoice made with recoverable reverse charge."""
 	condition = get_conditions_join(filters)
+	pi_total = get_pi_total()
 	return (
 		frappe.db.sql(
 			f"""
 			SELECT
-				SUM(
-					CASE
-						WHEN p.custom_is_dubai_customs = 1 THEN p.custom_taxable_value
-						ELSE p.base_net_total
-					END
-					)
+				SUM({pi_total})
 			FROM
 				`tabPurchase Invoice` p
 			WHERE
@@ -293,15 +302,12 @@ def get_reverse_charge_recoverable_total(filters):
 def get_reverse_charge_recoverable_tax(filters):
 	"""Returns the sum of the tax of each Purchase invoice made."""
 	conditions = get_conditions_join(filters)
+	pi_total = get_pi_total()
 	return (
         frappe.db.sql(
             f"""
             SELECT 
-				SUM((
-					CASE
-						WHEN p.custom_is_dubai_customs = 1 THEN p.custom_taxable_value
-						ELSE p.base_net_total
-					END
+				SUM(({pi_total}
 					* p.recoverable_reverse_charge / 100
 					) * 0.05)
             FROM 
@@ -342,15 +348,23 @@ def get_reverse_charge_recoverable_tax(filters):
 def get_material_transfer_total_for_dubai_customs(filters):
 	"""Returns the sum of the total of each Stock Entry having Dubai Customs."""
 	condition = get_conditions_join_se(filters)
+	if frappe.db.has_column("Stock Entry", "custom_is_dubai_customs") and frappe.db.has_column(
+		"Stock Entry", "custom_taxable_value"
+	):
+		se_total = """
+			CASE
+				WHEN se.custom_is_dubai_customs = 1 THEN se.custom_taxable_value
+				ELSE 0
+			END
+		"""
+	else:
+		se_total = "0"
+
 	return (
 		frappe.db.sql(
 			f"""
 			SELECT
-				SUM(
-					CASE
-						WHEN se.custom_is_dubai_customs = 1 THEN se.custom_taxable_value
-					END
-					)
+				SUM({se_total})
 			FROM
 				`tabStock Entry` se
 			WHERE
@@ -454,16 +468,12 @@ def get_tourist_tax_return_tax(filters):
 def get_zero_rated_purchases(filters):
 	"""Returns the sum of the total of each Purchase invoice made which is zero rated."""
 	condition = get_conditions_join(filters)
+	pi_total = get_pi_total()
 	return (
 		frappe.db.sql(
 			f"""
 			SELECT
-				SUM(
-					CASE
-						WHEN p.custom_is_dubai_customs = 1 THEN p.custom_taxable_value
-						ELSE p.base_net_total
-					END
-					)
+				SUM({pi_total})
 			FROM
 				`tabPurchase Invoice` p
 			WHERE

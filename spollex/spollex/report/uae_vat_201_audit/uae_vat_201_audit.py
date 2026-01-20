@@ -216,9 +216,23 @@ def get_tourist_tax_returns(filters):
 #			{conditions}
 #	""".format(conditions=conditions), filters, as_dict=1)
 
+def get_pi_total():
+	if frappe.db.has_column("Purchase Invoice", "custom_is_dubai_customs") and frappe.db.has_column(
+		"Purchase Invoice", "custom_taxable_value"
+	):
+		return """
+			CASE
+				WHEN custom_is_dubai_customs = 1 THEN custom_taxable_value
+				ELSE base_net_total
+			END
+		"""
+	return "base_net_total"
+
+
 def get_zero_rated_purchases(filters):
 	"""Returns the sum of the total of each Purchase invoice made which is zero rated."""
 	conditions = get_conditions(filters)
+	pi_total = get_pi_total()
 	return (
 		frappe.db.sql("""
 			SELECT
@@ -227,10 +241,7 @@ def get_zero_rated_purchases(filters):
 				name as voucher_no,
 				'Supplier' as party_type,
 				supplier as party,
-				CASE
-					WHEN custom_is_dubai_customs = 1 THEN custom_taxable_value
-					ELSE base_net_total
-				END as taxable_amount,
+				{pi_total} as taxable_amount,
 				0 as vat_amount,
 				'Supplies subject to the reverse charge provision' as legend,
 				'3' as row_no
@@ -241,7 +252,7 @@ def get_zero_rated_purchases(filters):
 				AND docstatus = 1
 				AND recoverable_standard_rated_expenses = 0
 				{conditions};
-		""".format(conditions=conditions), filters, as_dict=1)
+		""".format(conditions=conditions, pi_total=pi_total), filters, as_dict=1)
 	)
 
 def get_zero_rated_sales(filters):
@@ -300,7 +311,7 @@ def get_exempt_sales(filters):
 
 def get_imported_goods(filters):
 	conditions = get_conditions(filters)
-	
+	pi_total = get_pi_total()
 	return frappe.db.sql("""
 		SELECT 
 			posting_date,
@@ -308,16 +319,9 @@ def get_imported_goods(filters):
 			name as voucher_no,
 			'Supplier' as party_type,
 			supplier as party,
-			CASE
-				WHEN custom_is_dubai_customs = 1 THEN custom_taxable_value
-				ELSE base_net_total
-			END AS taxable_amount,
+			{pi_total} AS taxable_amount,
 			(
-				CASE
-					WHEN custom_is_dubai_customs = 1 THEN custom_taxable_value
-					ELSE base_net_total
-				END
-				* recoverable_reverse_charge / 100
+				{pi_total} * recoverable_reverse_charge / 100
 			) * 0.05 as vat_amount,
 			'Goods imported into UAE' as legend,
 			'6' as row_no
@@ -328,11 +332,21 @@ def get_imported_goods(filters):
 			AND reverse_charge = 'Y'
 			AND recoverable_reverse_charge > 0
 			{conditions}
-	""".format(conditions=conditions), filters, as_dict=1)
+	""".format(conditions=conditions, pi_total=pi_total), filters, as_dict=1)
 
 
 def get_material_transfers_for_dubai_customs(filters, legend, row_no):
 	conditions = get_conditions(filters)
+	if frappe.db.has_column("Stock Entry", "custom_is_dubai_customs") and frappe.db.has_column(
+		"Stock Entry", "custom_taxable_value"
+	):
+		taxable_amount = "se.custom_taxable_value"
+		vat_amount = "(se.custom_taxable_value * 0.05)"
+		customs_condition = "AND se.custom_is_dubai_customs = 1"
+	else:
+		taxable_amount = "0"
+		vat_amount = "0"
+		customs_condition = "AND 1=0"
 
 	return frappe.db.sql("""
 		SELECT
@@ -341,8 +355,8 @@ def get_material_transfers_for_dubai_customs(filters, legend, row_no):
 			se.name AS voucher_no,
 			NULL AS party_type,
 			NULL AS party,
-			se.custom_taxable_value AS taxable_amount,
-			(se.custom_taxable_value * 0.05) AS vat_amount,
+			{taxable_amount} AS taxable_amount,
+			{vat_amount} AS vat_amount,
 			%(legend)s AS legend,
 			%(row_no)s AS row_no
 		FROM
@@ -350,9 +364,10 @@ def get_material_transfers_for_dubai_customs(filters, legend, row_no):
 		WHERE
 			se.docstatus = 1
 			AND se.stock_entry_type = 'Material Transfer'
-			AND se.custom_is_dubai_customs = 1
+			{customs_condition}
 			{conditions}
-	""".format(conditions=conditions), { **filters, "legend": legend, "row_no": row_no } , as_dict=1)
+	""".format(conditions=conditions, taxable_amount=taxable_amount, vat_amount=vat_amount, customs_condition=customs_condition),
+	{ **filters, "legend": legend, "row_no": row_no } , as_dict=1)
 
 
 def get_standard_rated_purchases(filters):
@@ -380,7 +395,7 @@ def get_standard_rated_purchases(filters):
 
 def get_reverse_charge_purchases(filters):
 	conditions = get_conditions(filters)
-	
+	pi_total = get_pi_total()
 	return frappe.db.sql("""
 		SELECT 
 			posting_date,
@@ -388,16 +403,9 @@ def get_reverse_charge_purchases(filters):
 			name as voucher_no,
 			'Supplier' as party_type,
 			supplier as party,
-			CASE
-				WHEN custom_is_dubai_customs = 1 THEN custom_taxable_value
-				ELSE base_net_total
-			END AS taxable_amount,
+			{pi_total} AS taxable_amount,
 			(
-				CASE
-					WHEN custom_is_dubai_customs = 1 THEN custom_taxable_value
-					ELSE base_net_total
-				END
-				* recoverable_reverse_charge / 100
+				{pi_total} * recoverable_reverse_charge / 100
 			) * 0.05 as vat_amount,
 			'Supplies subject to the reverse charge provision' as legend,
 			'10' as row_no
@@ -408,7 +416,7 @@ def get_reverse_charge_purchases(filters):
 			AND reverse_charge = 'Y'
 			AND recoverable_reverse_charge > 0
 			{conditions}
-	""".format(conditions=conditions), filters, as_dict=1)
+	""".format(conditions=conditions, pi_total=pi_total), filters, as_dict=1)
 
 
 def get_conditions(filters):
