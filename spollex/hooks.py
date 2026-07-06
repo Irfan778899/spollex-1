@@ -53,6 +53,8 @@ app_include_js = "spollex.bundle.js"
 # include js in doctype views
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 doctype_js = {
+    "Quotation" : "public/js/quotation.js",
+    "Sales Order" : "public/js/sales_order.js",
     "Sales Invoice" : "public/js/sales_invoice.js",
     "Purchase Invoice" : "public/js/purchase_invoice.js",
     "Purchase Order" : "public/js/purchase_order.js",
@@ -155,13 +157,6 @@ doctype_js = {
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
 doc_events = {
     "Purchase Invoice": {
         "on_submit": "spollex.doctype_events.purchase_invoice.create_journal_entry_on_submit",
@@ -180,6 +175,19 @@ doc_events = {
 	"Maintenance Visit": {
 		"on_submit": "spollex.doctype_events.maintenance_visit.update_contract_visits",
         "on_cancel": "spollex.doctype_events.maintenance_visit.update_contract_visits"
+	},
+	"Quotation": {
+		"validate": "spollex.doctype_events.quotation.validate_subscription_details"
+	},
+	"Sales Order": {
+		"validate": "spollex.doctype_events.sales_order.validate_subscription_details",
+		"on_submit": "spollex.doctype_events.sales_order.update_renewal_invoice_status",
+		"on_cancel": "spollex.doctype_events.sales_order.update_renewal_invoice_status"
+	},
+	"Sales Invoice": {
+		"validate": "spollex.doctype_events.sales_invoice.validate_subscription_details",
+		"on_submit": "spollex.doctype_events.sales_invoice.update_renewal_invoice_status",
+		"on_cancel": "spollex.doctype_events.sales_invoice.update_renewal_invoice_status"
 	}
 }
 
