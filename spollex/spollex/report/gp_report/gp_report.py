@@ -479,9 +479,10 @@ class GrossProfitGenerator:
 
 			row.base_amount = flt(row.base_net_amount, self.currency_precision)
 
-			row.stock_creation_documents = self.get_stock_creation_documents(
-				row.parent, row.item_code, row.warehouse, row.posting_date, row.item_row
-			)
+			if "stock_creation_documents" not in row:
+				row.stock_creation_documents = self.get_stock_creation_documents(
+					row.parent, row.item_code, row.warehouse, row.posting_date, row.item_row
+				)
 
 			product_bundles = []
 			if row.update_stock:
@@ -931,6 +932,21 @@ class GrossProfitGenerator:
 			as_dict=1,
 		)
 
+		stock_creation_doc = (
+			self.filters.get("stock_creation_document") or self.filters.get("stock_creation_documents")
+		)
+		if stock_creation_doc:
+			stock_creation_doc = stock_creation_doc.strip().lower()
+			filtered_si_list = []
+			for row in self.si_list:
+				docs = self.get_stock_creation_documents(
+					row.parent, row.item_code, row.warehouse, row.posting_date, row.item_row
+				)
+				row.stock_creation_documents = docs
+				if docs and stock_creation_doc in docs.lower():
+					filtered_si_list.append(row)
+			self.si_list = filtered_si_list
+
 	def get_delivery_notes(self):
 		self.delivery_notes = frappe._dict({})
 		if self.si_list:
@@ -1220,6 +1236,11 @@ class GrossProfitGenerator:
 		return "; ".join(row_related) if row_related else None
 
 	def get_creation_docs_from_bundle(self, bundle):
+		if not hasattr(self, "_bundle_creation_docs"):
+			self._bundle_creation_docs = {}
+		if bundle in self._bundle_creation_docs:
+			return self._bundle_creation_docs[bundle]
+
 		related = {}
 		serials = frappe.db.sql("""
 			SELECT sn.purchase_document_no
@@ -1231,7 +1252,64 @@ class GrossProfitGenerator:
 		for row in serials:
 			related[row.purchase_document_no] = related.get(row.purchase_document_no, 0) + 1
 
+		self._bundle_creation_docs[bundle] = related
 		return related
 
 
 
+
+@frappe.whitelist()
+def get_stock_creation_documents_list(doctype=None, txt=None, searchfield=None, start=0, page_len=20, filters=None, company=None):
+	"""Custom query for Stock Creation Document filter in GP Report.
+
+	Returns list of dicts with value, label, description for Frappe Autocomplete control.
+	"""
+	import json as _json
+
+	if not txt:
+		txt = ""
+
+	if not company and filters:
+		if isinstance(filters, str):
+			filters = _json.loads(filters)
+		if isinstance(filters, dict):
+			company = filters.get("company")
+
+	params = {"txt": f"%{txt}%", "limit": cint(page_len) or 20}
+	conditions = ""
+	if company:
+		conditions += " AND (sn.company = %(company)s OR sn.company IS NULL OR sn.company = '')"
+		params["company"] = company
+
+	rows = frappe.db.sql(
+		f"""
+			SELECT DISTINCT sn.purchase_document_no
+			FROM `tabSerial No` sn
+			WHERE sn.purchase_document_no IS NOT NULL
+				AND sn.purchase_document_no != ''
+				AND sn.purchase_document_no LIKE %(txt)s
+				{conditions}
+			ORDER BY sn.modified DESC
+			LIMIT %(limit)s
+		""",
+		params,
+	)
+
+	_prefix_map = {
+		"PINV": "Purchase Invoice",
+		"PR":   "Purchase Receipt",
+		"SE":   "Stock Entry",
+		"DN":   "Delivery Note",
+		"SINV": "Sales Invoice",
+	}
+
+	def _doc_type_label(name):
+		for part in name.split("-"):
+			if part.upper() in _prefix_map:
+				return _prefix_map[part.upper()]
+		return ""
+
+	return [
+		{"value": row[0], "label": row[0], "description": _doc_type_label(row[0])}
+		for row in rows
+	]
