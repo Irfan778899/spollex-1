@@ -66,7 +66,22 @@ frappe.query_reports["GP Report"] = {
 				};
 			},
 		},
+		{
+			fieldname: "stock_creation_document",
+			label: __("Stock Creation Document"),
+			fieldtype: "Autocomplete",
+			ignore_validation: 1,
+			get_query: function () {
+				var company = frappe.query_report.get_filter_value("company");
+				return {
+					query: "spollex.spollex.report.gp_report.gp_report.get_stock_creation_documents_list",
+					params: { company: company },
+				};
+			},
+		},
 	],
+
+
 	tree: true,
 	name_field: "parent",
 	parent_field: "parent_invoice",
