@@ -165,6 +165,15 @@ frappe.query_reports["Stock Balance Custom"] = {
 	onload: function (report) {
 		report.page.add_inner_button(__("View Stock Ledger"), function () {
 			var filters = report.get_values();
+			if (filters.item_group) {
+				if (Array.isArray(filters.item_group)) {
+					if (filters.item_group.length === 1) {
+						filters.item_group = filters.item_group[0];
+					} else {
+						delete filters.item_group;
+					}
+				}
+			}
 			frappe.set_route("query-report", "Stock Ledger", filters);
 		});
 	},
